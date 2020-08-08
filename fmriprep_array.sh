@@ -8,7 +8,6 @@ echo singularity_path: ${singularity_path:=/Shared/lss_kahwang_hpc/opt/fmriprep/
 echo working_directory: ${working_directory:=/nfsscratch/${USER}/work/}
 
 subjects=($(ls -d ${bids_directory}sub-* | cut -d '/' -f 6 | cut -d '-' -f 2))
-subjects=(03 14)
 total_subjects=${#subjects[@]}
 
 echo subjects: ${subjects[@]}
