@@ -7,8 +7,10 @@ import os
 import glob2 as glob
 
 ###Constants
-DEFAULT_COLUMNS=list()
-REGRESSOR_FILE='nuisance.1D'
+DEFAULT_COLUMNS = list()
+REGRESSOR_FILE = 'nuisance.1D'
+DECONVOLVE_DIR = '3dDeconvolve/'
+
 
 ###Classes
 class Stimfile:
@@ -75,13 +77,11 @@ def append_regressor_files(dir, subject):
 
 
 def find_run_events(dir, subject):
-    """Gets all events.tsv for specified subject in data directory."""
     return sorted(glob.glob(f"{dir}*/*{subject}*/**/*events.tsv", recursive=True))
 
 
 
 def inst_stimfiles(sub_deconvolve_dir, run_event_files):
-    """Instantiates stimulus timing files for each task."""
     stimfiles = list()
 
     for run_file in run_event_files:
@@ -96,7 +96,6 @@ def inst_stimfiles(sub_deconvolve_dir, run_event_files):
 
 
 def generate_stimfiles(stimfiles, run_event_files):
-    """Adds stimulus timing data to stimfiles."""
     #add run timing data to stimfiles
     for run_num, run_file in enumerate(run_event_files, start=1):
         #load event timing tsv files
@@ -122,7 +121,6 @@ def generate_stimfiles(stimfiles, run_event_files):
 
 ###Main
 def main():
-    #parse command line arguments
     parser = init_argparse()
     args = parser.parse_args()
 
@@ -130,8 +128,7 @@ def main():
     if not args.nodef:
         args.col.append(DEFAULT_COLUMNS)
 
-    #create 3dDeconvolve and subject directories if not present already
-    deconvolve_dir = f"{args.dataset_dir}3dDeconvolve/"
+    deconvolve_dir = f"{args.dataset_dir}{DECONVOLVE_DIR}"
     if not os.path.isdir(deconvolve_dir):
         os.mkdir(deconvolve_dir)
     sub_deconvolve_dir = f"{deconvolve_dir}sub-{args.subject}/"
@@ -146,7 +143,6 @@ def main():
     stimfiles = inst_stimfiles(sub_deconvolve_dir, run_event_files)
     generate_stimfiles(stimfiles, run_event_files)
 
-    #write stimfiles
     for stimfile in stimfiles:
         stimfile.write_file()
 

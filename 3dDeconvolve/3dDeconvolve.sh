@@ -1,27 +1,8 @@
 #!/bin/bash
 set_variables() {
-  data=$1
+  subject_directory=$1
   output_path=$2
   output_file=${output_file}/all_nuisance.1D
-}
-
-prep_regressors() {
-
-  #this will create an empty file
-  echo -n $output_file
-
-  cd $data
-  runs=(ls *regressors.tsv)
-
-  for run in runs; do
-    # pipe everything after the first line into the empty file we just created
-    cat run | tail -n+2 >> $output_file
-    # beware of the difference between ">" and ">>"
-
-  done
-
-  cat $output_path/all_nuisance.1D | cut -f23-28,203,207,211,215,219,223  > $output_path/nuisance.1D
-  echo "Regressor prep complete. $output_path created."
 }
 
 run_3dDeconvolve() {
@@ -57,7 +38,7 @@ run_3dDeconvolve() {
 
 main() {
   set_variables
-  prep_regressors
+  python3 3dDeconvolve.py $subject_directory $output_path ${columns_to_remove}
   run_3dDeconvolve
 }
 
