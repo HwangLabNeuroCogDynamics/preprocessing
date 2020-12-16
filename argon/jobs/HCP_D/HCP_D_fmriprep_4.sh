@@ -1,20 +1,38 @@
 #!/bin/bash
-# SGE OPTIONS
-SGE_OPTIONS
+# SGE 
+#$ -N HCP_D_fmriprep
+#$ -q SEASHORE
+#$ -pe smp 8
+#$ -o /localscratch/Users/esorenson/$JOB_NAME_$TASK_ID.o
+#$ -e /localscratch/Users/esorenson/$JOB_NAME_$TASK_ID.e
+#$ -t 1-2
+#$ -ckpt user
+#$ -l mt=16G
+export OMP_NUM_THREADS=8
 
 # BASE SCRIPT
-BASE_SCRIPT
+/bin/echo Running on compute node: `hostname`.
+/bin/echo Job: $JOB_ID
+/bin/echo Task: $SGE_TASK_ID
+/bin/echo In directory: `pwd`
+/bin/echo Starting on: `date`
+
+
+subjects=(2046842 2062537)
+echo subjects: ${subjects[@]}
+echo total_subjects=${#subjects[@]}
+subject="${subjects[$SGE_TASK_ID-1]}"
 
 FMRIPREP='fmriprep/'
 FREESURFER='freesurfer/'
 BIDS='BIDS/'
 
-dataset_name=DATASET_NAME
-dataset_dir=DATASET_DIR
-slots=SLOTS
-bids_dir=BIDS_DIR
+dataset_name=HCP_D
+dataset_dir=/Shared/lss_kahwang_hpc/data/HCP_D/
+slots=8
+bids_dir=/Dedicated/inc_data/HCP_D/rawdata/
 singularity_path=/Shared/lss_kahwang_hpc/opt/${FMRIPREP}fmriprep-20.1.1.simg
-working_dir=WORK_DIR
+working_dir=/localscratch/Users/esorenson/${JOB_ID}_${SGE_TASK_ID}/
 is_highthroughput=IS_HT
 
 freesurfer_lic=/Shared/lss_kahwang_hpc/opt/${FREESURFER}license.txt
@@ -47,11 +65,8 @@ mkdir $working_freesurfer_dir
 
 echo Starting fmriprep on $subject
 
-# copy subject BIDS data to working dir
-cp -r ${bids_dir}sub-${subject}/ $working_bids_dir
-
-# special case for HCP_D data
 if [[ $bids_dir =~ "/Dedicated/inc_data/" ]]; then
+  cp -r ${bids_dir}sub-${subject}/ $working_bids_dir
   ls $working_bids_dir
   cd ${working_bids_dir}sub-${subject}
   cd ${working_bids_dir}sub-${subject}/fmap/
@@ -99,7 +114,7 @@ if [ -d ${fmriprep_sub_dir} ]; then
   cp -r $fmriprep_sub_dir $working_fmriprep_dir
 fi
 
-# copy freesurfer dir to working dir if exists, remove IsRunning.lh
+# copy freesurfer dir to working dir if exists, renove IsRunning.lh
 if [ -d ${freesurfer_sub_dir} ]; then
   rm ${freesurfer_sub_dir}scripts/*IsRunning*
   cp -r $freesurfer_sub_dir $working_freesurfer_dir
@@ -116,7 +131,7 @@ participant --participant_label $subject \
 --fs-license-file ${freesurfer_lic} \
 --skip-bids-validation \
 --mem 16 \
-OPTIONS
+
 
 } ||
 {

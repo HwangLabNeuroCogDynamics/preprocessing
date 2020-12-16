@@ -6,11 +6,11 @@ BASE_SCRIPT
 dataset_dir=DATASET_DIR
 slots=SLOTS
 bids_dir=BIDS_DIR
-singularity_path=SING_PATH
+singularity_path=/opt/fmriprep/fmriprep-20.1.1.simg
 working_dir=WORK_DIR
-freesurfer_lic=LIC_PATH
+freesurfer_lic=/opt/freesurfer/license.txt
 logs_dir=${dataset_dir}fmriprep/logs/
-is_failed=false
+is_finished=false
 
 echo dataset_dir: $dataset_dir
 echo slots: $slots
@@ -21,6 +21,8 @@ echo freesurfer_license: $freesurfer_lic
 
 for subject in "${subjects[@]}"
 do
+  {
+  echo Starting fmriprep on $subject
   ( echo Starting fmriprep on $subject
 
   if [ -f ${dataset_dir}freesurfer/sub-${subject}/scripts/IsRunning.lh+rh ]; then
@@ -39,20 +41,33 @@ do
   --skip-bids-validation \
   OPTIONS
 
+  is_finished=true
   } ||
   {
-    # when erorr is thrown
-    is_failed=true
-    if [ grep -Fxq "A process in the process pool was terminated abruptly while the future was running or pending."  ]; then
+    # when error is thrown
+    echo $is_finished
+    echo "Error when running fmriprep"
+  }
+  ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e"
+
+  if [ "$is_finished" = true ]; then
+    echo "$subject successfully completed."
+    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+      sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
+    sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
+    echo $subject >> ${logs_dir}completed_subjects.txt
+  else
+    echo "$subject failed. Check logs for more information."
+    # when error is thrown
+    if [ grep -Fxq "A process in the process pool was terminated abruptly while the future was running or pending." "${logs_dir}${subject}.o" ]; then
+      sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
       echo $subject >> ${logs_dir}mem_failed_subjects.txt
     else
+      sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
       echo $subject >> ${logs_dir}failed_subjects.txt
     fi
-  }
-
-  if [ "$is_failed" = false ]; then
-    echo $subject >> ${logs_dir}completed_subjects.txt
-  fi ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e" &
+  fi
+  } &
 done
 wait
 

@@ -1,20 +1,35 @@
 #!/bin/bash
-# SGE OPTIONS
-SGE_OPTIONS
+# SGE
+#$ -N IBC_fmriprep
+#$ -q all.q
+#$ -pe smp 16
+#$ -t 1-12
+#$ -ckpt user
+export OMP_NUM_THREADS=16
 
 # BASE SCRIPT
-BASE_SCRIPT
+/bin/echo Running on compute node: `hostname`.
+/bin/echo Job: $JOB_ID
+/bin/echo Task: $SGE_TASK_ID
+/bin/echo In directory: `pwd`
+/bin/echo Starting on: `date`
+
+
+subjects=(01 02 04 05 06 07 08 09 11 12 13 14)
+echo subjects: ${subjects[@]}
+echo total_subjects=${#subjects[@]}
+subject="${subjects[$SGE_TASK_ID-1]}"
 
 FMRIPREP='fmriprep/'
 FREESURFER='freesurfer/'
 BIDS='BIDS/'
 
-dataset_name=DATASET_NAME
-dataset_dir=DATASET_DIR
-slots=SLOTS
-bids_dir=BIDS_DIR
+dataset_name=IBC
+dataset_dir=../data/IBC/
+slots=16
+bids_dir=../data/IBC/BIDS/
 singularity_path=/Shared/lss_kahwang_hpc/opt/${FMRIPREP}fmriprep-20.1.1.simg
-working_dir=WORK_DIR
+working_dir=/localscratch/Users/esorenson/${JOB_ID}_${SGE_TASK_ID}/
 is_highthroughput=IS_HT
 
 freesurfer_lic=/Shared/lss_kahwang_hpc/opt/${FREESURFER}license.txt
@@ -52,7 +67,6 @@ cp -r ${bids_dir}sub-${subject}/ $working_bids_dir
 
 # special case for HCP_D data
 if [[ $bids_dir =~ "/Dedicated/inc_data/" ]]; then
-  ls $working_bids_dir
   cd ${working_bids_dir}sub-${subject}
   cd ${working_bids_dir}sub-${subject}/fmap/
   for file in $(ls *fieldmap*)
@@ -91,15 +105,13 @@ if [[ $bids_dir =~ "/Dedicated/inc_data/" ]]; then
   echo $bids_dir
 fi
 
-# copy bids dir to working dir
-
 
 # copy fmriprep dir to working dir if exists
 if [ -d ${fmriprep_sub_dir} ]; then
   cp -r $fmriprep_sub_dir $working_fmriprep_dir
 fi
 
-# copy freesurfer dir to working dir if exists, remove IsRunning.lh
+# copy freesurfer dir to working dir if exists, renove IsRunning.lh
 if [ -d ${freesurfer_sub_dir} ]; then
   rm ${freesurfer_sub_dir}scripts/*IsRunning*
   cp -r $freesurfer_sub_dir $working_freesurfer_dir
@@ -116,7 +128,7 @@ participant --participant_label $subject \
 --fs-license-file ${freesurfer_lic} \
 --skip-bids-validation \
 --mem 16 \
-OPTIONS
+
 
 } ||
 {

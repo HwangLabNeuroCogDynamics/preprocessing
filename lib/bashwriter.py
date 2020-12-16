@@ -13,11 +13,18 @@ class Bashfile:
         self.script = []
         self.sub_args = subjects.to_subargs()
         self.total_tasks = len(subjects)
-        self.slots = args.slots
-        self.mem = args.mem
-        self.no_resubmit = args.no_resubmit
-        self.is_emailed = args.email
-        self.hold_jid = args.hold_jid
+        if not args.is_thalamege:
+            self.mem = args.mem
+            self.no_resubmit = args.no_resubmit
+            self.is_emailed = args.email
+            self.hold_jid = args.hold_jid
+            if args.queue:
+                self.queue = args.queue
+            elif self.total_tasks * self.slots <= 160:
+                self.queue = s.DEFAULT_QUEUE
+            else:
+                self.queue = s.LARGE_QUEUE
+
         self.is_thalamege = args.is_thalamege
         self.output_dir = output_dir
         self.process_dir = process_dir
@@ -30,39 +37,33 @@ class Bashfile:
             self.ofile = work_dir_base + '$JOB_NAME.o'
             self.efile = work_dir_base + '$JOB_NAME.e'
 
-        if args.queue:
-            self.queue = args.queue
-        elif self.total_tasks * self.slots <= 160:
-            self.queue = s.DEFAULT_QUEUE
-        else:
-            self.queue = s.LARGE_QUEUE
-
         self.create_base()
 
     def create_base(self):
-        # set sge options
-        self.sge_lines.append(f"#$ -N {self.job_name}")
-        self.sge_lines.append(f"#$ -q {self.queue}")
-        self.sge_lines.append(f"#$ -pe smp {self.slots}")
-        self.sge_lines.append(f"#$ -o {self.ofile}")
-        self.sge_lines.append(f"#$ -e {self.efile}")
+        if not self.is_thalamege:
+            # set sge options
+            self.sge_lines.append(f"#$ -N {self.job_name}")
+            self.sge_lines.append(f"#$ -q {self.queue}")
+            self.sge_lines.append(f"#$ -pe smp {self.slots}")
+            self.sge_lines.append(f"#$ -o {self.ofile}")
+            self.sge_lines.append(f"#$ -e {self.efile}")
 
-        if self.total_tasks > 1:
-            self.sge_lines.append(f"#$ -t 1-{self.total_tasks}")
-            if not self.no_resubmit:
-                self.sge_lines.append("#$ -ckpt user")
+            if self.total_tasks > 1:
+                self.sge_lines.append(f"#$ -t 1-{self.total_tasks}")
+                if not self.no_resubmit:
+                    self.sge_lines.append("#$ -ckpt user")
 
-        if self.mem:
-            self.sge_lines.append(f'#$ -l {self.mem}')
+            if self.mem:
+                self.sge_lines.append(f'#$ -l {self.mem}')
 
-        if self.hold_jid:
-            self.sge_lines.append(f'#$ -hold_jid_ad {self.hold_jid}')
+            if self.hold_jid:
+                self.sge_lines.append(f'#$ -hold_jid_ad {self.hold_jid}')
 
-        if self.is_emailed:
-            self.sge_lines.append("#$ -m e")
-            self.sge_lines.append(f"#$ -M {getpass.getuser()}@uiowa.edu")
+            if self.is_emailed:
+                self.sge_lines.append("#$ -m e")
+                self.sge_lines.append(f"#$ -M {getpass.getuser()}@uiowa.edu")
 
-        self.sge_lines.append(f'export OMP_NUM_THREADS={self.slots}')
+            self.sge_lines.append(f'export OMP_NUM_THREADS={self.slots}')
 
         # start script
         self.script.append("/bin/echo Running on compute node: `hostname`.")
