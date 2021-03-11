@@ -14,18 +14,28 @@ dataset_dir=DATASET_DIR
 slots=SLOTS
 bids_dir=BIDS_DIR
 singularity_path=/Shared/lss_kahwang_hpc/opt/${FMRIPREP}fmriprep-20.1.1.simg
-working_dir=WORK_DIR
-is_highthroughput=IS_HT
+use_localscratch=false
 
 freesurfer_lic=/Shared/lss_kahwang_hpc/opt/${FREESURFER}license.txt
 fmriprep_dir=${dataset_dir}${FMRIPREP}
 freesurfer_dir=${dataset_dir}${FREESURFER}
 freesurfer_sub_dir=${dataset_dir}${FREESURFER}sub-${subject}/
 fmriprep_sub_dir=${dataset_dir}${FMRIPREP}sub-${subject}/
-working_dataset_dir=${working_dir}${dataset_name}/
-working_bids_dir=${working_dataset_dir}${BIDS}
-working_fmriprep_dir=${working_dataset_dir}${FMRIPREP}
-working_freesurfer_dir=${working_dataset_dir}${FREESURFER}
+
+if [ "$use_localscracth" = true]; then
+  working_dataset_dir=${TMPDIR}
+  working_dir=${TMPDIR}work/
+  working_bids_dir=${TMPDIR}${BIDS}
+  working_fmriprep_dir=${TMPDIR}${FMRIPREP}
+  working_freesurfer_dir=${TMPDIR}${FREESURFER}
+else
+  working_dataset_dir=${dataset_dir}
+  working_dir=${dataset_dir}work/
+  working_bids_dir=${dataset_dir}${BIDS}
+  working_fmriprep_dir=${dataset_dir}${FMRIPREP}
+  working_freesurfer_dir=${dataset_dir}${FREESURFER}
+fi
+
 logs_dir=${fmriprep_dir}logs/
 is_failed=false
 
@@ -33,11 +43,11 @@ echo dataset_dir: $dataset_dir
 echo slots: $slots
 echo bids_directory: $bids_dir
 echo singularity_path: $singularity_path
-echo working_directory: $working_dir
-echo working_dataset_dir: $working_dataset_dir
+echo temp_dir: $TMPDIR
 echo working_fmriprep_dir: $working_fmriprep_dir
 echo working_freesurfer_dir: $working_freesurfer_dir
 echo freesurfer_license: $freesurfer_lic
+
 
 mkdir $working_dir
 mkdir $working_dataset_dir
@@ -47,65 +57,67 @@ mkdir $working_freesurfer_dir
 
 echo Starting fmriprep on $subject
 
-# copy subject BIDS data to working dir
-cp -r ${bids_dir}sub-${subject}/ $working_bids_dir
+# high throughput-jobs must copy over data to work locally
+if [ "$use_localscratch" = true ]; then
 
-# special case for HCP_D data
-if [[ $bids_dir =~ "/Dedicated/inc_data/" ]]; then
-  ls $working_bids_dir
-  cd ${working_bids_dir}sub-${subject}
-  cd ${working_bids_dir}sub-${subject}/fmap/
-  for file in $(ls *fieldmap*)
-  do
-      mv "${file}" "${file/fieldmap/epi}"
-  done
+  # copy subject BIDS data to working dir
+  cp -r ${bids_dir}sub-${subject}/ $working_bids_dir
 
-  for file in $(ls *.json)
-  do
-      intendedFile1=''
-      intendedFile2=''
-      if [[ $file =~ 'AP' ]]; then
-        echo "This is AP $file"
-        intendedFile1="func/$file"
-        intendedFile2="func/${file/AP/PA}"
-      else
-        echo "This is PA $file"
-        intendedFile1="func/$file"
-        intendedFile2="func/${file/PA/AP}"
-      fi
-      intendedFile1=${intendedFile1/epi.json/bold.nii.gz}
-      intendedFile2=${intendedFile2/epi.json/bold.nii.gz}
-      intendedFile1=${intendedFile1/acq/task}
-      intendedFile2=${intendedFile2/acq/task}
-      echo $intendedFile1 $intendedFile2
-      if [[ $file =~ acq-emotion_dir-AP ]]; then
-        sed -i "s|\"$intendedFile1\"|\"$intendedFile2\"|g" $file
-      elif [[ $file =~ acq-emotion_dir-PA ]]; then
-        echo 'Do nothing'
-      else
-        sed -i "s|\"$intendedFile1\"|[\"$intendedFile1\", \"$intendedFile2\"]|g" $file
-        less $file
-      fi
-  done
+  # special case for HCP_D data
+  if [[ $bids_dir =~ "/Dedicated/inc_data/HCP_D" ]]; then
+    ls $working_bids_dir
+    cd ${working_bids_dir}sub-${subject}
+    cd ${working_bids_dir}sub-${subject}/fmap/
+    for file in $(ls *fieldmap*)
+    do
+        mv "${file}" "${file/fieldmap/epi}"
+    done
 
-  echo $bids_dir
+    for file in $(ls *.json)
+    do
+        intendedFile1=''
+        intendedFile2=''
+        if [[ $file =~ 'AP' ]]; then
+          echo "This is AP $file"
+          intendedFile1="func/$file"
+          intendedFile2="func/${file/AP/PA}"
+        else
+          echo "This is PA $file"
+          intendedFile1="func/$file"
+          intendedFile2="func/${file/PA/AP}"
+        fi
+        intendedFile1=${intendedFile1/epi.json/bold.nii.gz}
+        intendedFile2=${intendedFile2/epi.json/bold.nii.gz}
+        intendedFile1=${intendedFile1/acq/task}
+        intendedFile2=${intendedFile2/acq/task}
+        echo $intendedFile1 $intendedFile2
+        if [[ $file =~ acq-emotion_dir-AP ]]; then
+          sed -i "s|\"$intendedFile1\"|\"$intendedFile2\"|g" $file
+        elif [[ $file =~ acq-emotion_dir-PA ]]; then
+          echo 'Do nothing'
+        else
+          sed -i "s|\"$intendedFile1\"|[\"$intendedFile1\", \"$intendedFile2\"]|g" $file
+          less $file
+        fi
+    done
+  fi
+
+  # copy fmriprep dir to working dir if exists
+  if [ -d ${fmriprep_sub_dir} ]; then
+    cp -r $fmriprep_sub_dir $working_fmriprep_dir
+  fi
+
+  # copy freesurfer dir to working dir if exists
+  if [ -d ${freesurfer_sub_dir} ]; then
+    cp -r $freesurfer_sub_dir $working_freesurfer_dir
+  fi
 fi
 
-# copy bids dir to working dir
-
-
-# copy fmriprep dir to working dir if exists
-if [ -d ${fmriprep_sub_dir} ]; then
-  cp -r $fmriprep_sub_dir $working_fmriprep_dir
-fi
-
-# copy freesurfer dir to working dir if exists, remove IsRunning.lh
 if [ -d ${freesurfer_sub_dir} ]; then
   rm ${freesurfer_sub_dir}scripts/*IsRunning*
-  cp -r $freesurfer_sub_dir $working_freesurfer_dir
 fi
 
-# run fmriprep singularity container
+
 {
 singularity run --cleanenv -B $working_dataset_dir $singularity_path \
 $working_bids_dir \
@@ -114,13 +126,13 @@ participant --participant_label $subject \
 --nthreads $slots --omp-nthreads $slots \
 -w $working_dir \
 --fs-license-file ${freesurfer_lic} \
---skip-bids-validation \
---mem 16 \
+--mem $SLOTS \
+--skip_bids_validation \
 OPTIONS
 
 } ||
 {
-  # when erorr is thrown
+  # when error is thrown
   is_failed=true
   if grep -Fq "A process in the process pool was terminated abruptly while the future was running or pending." $SGE_STDERR_PATH; then
     echo $subject >> ${logs_dir}mem_failed_subjects.txt
@@ -133,17 +145,13 @@ if [ "$is_failed" = false ]; then
   echo $subject >> ${logs_dir}completed_subjects.txt
 fi
 
-# move fmriprep, freesurfer, and stdout/err files to dataset dir and delete
-# working dir if on localscratch
+# move fmriprep, freesurfer, and stdout/err files to dataset dir
+cp -r $working_dir $dataset_dir
 cp -r $working_fmriprep_dir $dataset_dir
 cp -r $working_freesurfer_dir $dataset_dir
 
 /bin/echo Finished on: `date`
 mv -u $SGE_STDOUT_PATH ${logs_dir}${subject}.o
 mv -u $SGE_STDERR_PATH ${logs_dir}${subject}.e
-if [[ $working_dir =~ "localscratch" ]]; then
-  rm  -r $working_dir
-fi
-
 
 #####End Compute Work#####

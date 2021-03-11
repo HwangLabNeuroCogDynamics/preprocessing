@@ -13,6 +13,7 @@ class Bashfile:
         self.script = []
         self.sub_args = subjects.to_subargs()
         self.total_tasks = len(subjects)
+        self.slots = args.slots
         if not args.is_thalamege:
             self.mem = args.mem
             self.no_resubmit = args.no_resubmit

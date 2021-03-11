@@ -6,17 +6,16 @@ import sys
 import math
 
 
-def print_FD_stats(dir_tree, subjects, bids_dir=None, threshold=0.2):
+def print_FD_stats(dir_tree, subjects, threshold=0.2):
     run_output_df = pd.DataFrame(columns=['Subject', 'Run',
                                           'Mean FD', f'% points over {threshold}'])
     sub_output_df = pd.DataFrame(columns=['Subject',
                                           'Mean FD', f'% points over {threshold}'])
-
     run_index = 0
+    print(subjects)
     for subject_index, subject in enumerate(subjects):
-        sub_files = common.get_ses_files(subject.sessions,
-                                         f"{subject.fmriprep_dir}{bs.SESSION}"
-                                         f"/{bs.FUNC_DIR}*{s.REGRESSOR_WC}")
+        sub_files = common.get_ses_files(subject, subject.fmriprep_dir + bs.FUNC_DIR,
+        f'*{s.REGRESSOR_WC}')
         sub_points_over = 0
         total_points = 0
         FD_total = 0
@@ -68,7 +67,3 @@ def print_FD_stats(dir_tree, subjects, bids_dir=None, threshold=0.2):
                          index=False)
     sub_output_df.to_csv(dir_tree.analysis_dir + 'FD_stats_subject.csv',
                          index=False)
-
-
-if __name__ == '__main__':
-    globals()[sys.argv[1]](sys.argv[2])

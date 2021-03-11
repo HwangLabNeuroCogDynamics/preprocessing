@@ -16,7 +16,6 @@ import zipfile
 import sys
 import glob as glob
 import pandas as pd
-import json
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -65,11 +64,6 @@ def init_argparse() -> argparse.ArgumentParser:
                      action='store_false',
                      dest='is_qsub',
                      help="Does not submit generated bash scripts.")
-
-    gen.add_argument('--rerun',
-                     action='store_true',
-                     default=False,
-                     help="Rerun failed subjects (non-memory issues)")
     gen.add_argument('--rerun_mem',
                      action='store_true',
                      default=False,
@@ -112,109 +106,132 @@ def init_argparse() -> argparse.ArgumentParser:
     heudiconv_parser = subparsers.add_parser(s.HEUDICONV,
                                              parents=[subs, dirs, general],
                                              usage='[SCRIPT_PATH][OPTIONS]',
-                                             help='''Convert raw data files to
+                                             help="""Convert raw data files to
                                                  BIDS format. Conversion script
-                                                 filepath is required.''')
+                                                 filepath is required.""")
     heudiconv_parser.add_argument('script_path',
-                                  help='''Filename of script. Script must be
+                                  help="""Filename of script. Script must be
                                       located in following directory:
-                                      /data/backed_up/shared/bin/heudiconv/heuristics/''')
+                                      /data/backed_up/shared/bin/heudiconv/heuristics/""")
     heudiconv_parser.add_argument('--post_conv_script',
-                                  help='''Filepath of post-heudiconv Conversion
+                                  help="""Filepath of post-heudiconv Conversion
                                   script. Ocassionally needed to make further
-                                  changes after running heudiconv.''')
+                                  changes after running heudiconv.""")
 
     mriqc_parser = subparsers.add_parser(s.MRIQC,
                                          parents=[subs, dirs, general, argon],
                                          usage='[OPTIONS]',
-                                         help='''Run mriqc on dataset to analyze
-                                             quality of data.''')
+                                         help="""Run mriqc on dataset to analyze
+                                             quality of data.""")
     mriqc_parser.add_argument('--group',
                               action='store_true',
                               help="""Run group analysis for mriqc instead of default
                                 participant level""")
     mriqc_parser.add_argument('--mriqc_opt',
-                              help='Options to add to mriqc. Write between \'\' as'
-                              ' shown: \'--[OPTION1] --[OPTION2] ...\'')
+                              help="""Options to add to mriqc. Write between \'\' as
+                               shown: \'--[OPTION1] --[OPTION2] ...\'""")
 
     fmriprep_parser = subparsers.add_parser(s.FMRIPREP,
                                             parents=[subs, dirs,
                                                      general, argon],
                                             usage='[OPTIONS]',
-                                            help='''Preprocess data with
-                                                fmriprep pipeline.''')
+                                            help="""Preprocess data with
+                                                fmriprep pipeline.""")
     fmriprep_parser.add_argument('--fmriprep_opt',
                                  help="""Options to add to fmriprep. Write between \'\'
-                                     and replace - with * as shown: \'**[OPTION1] arg1 **[OPTION2] ...\'""")
+                              and replace - with * as shown: \'**[OPTION1] arg1 ** [OPTION2] ...\'""")
 
     deconvolve_parser = subparsers.add_parser(s.DECONVOLVE,
                                               parents=[subs, dirs,
                                                        general, argon],
                                               usage='[stimulus_header][timing_header][OPTIONS]',
-                                              help='''Parse regressor files to
-                                              extract columns and censor motion.''')
+                                              help="""Parse regressor files to
+                                              extract columns and censor motion.""")
     deconvolve_parser.add_argument('stimulus_header',
-                                   help='''Header of column for stimulus type in
-                                    run timing file.''')
+                                   help="""Header of column for stimulus type in
+                                    run timing file.""")
     deconvolve_parser.add_argument('timing_header',
-                                   help='''Header of column for time of stimulus
-                                   presentation in run timing file.''')
+                                   help="""Header of column for time of stimulus
+                                   presentation in run timing file.""")
     deconvolve_parser.add_argument('--timing_file_dir',
                                    help="""Directory holding run timing files.
                                    Default is dataset BIDS directory.""")  # todo default needs work
     deconvolve_parser.add_argument('--file_wc',
                                    default='*',
-                                   help='''Wildcard used to find run timing
+                                   help="""Wildcard used to find run timing
                                    files using glob. Must have * at beggining.
-                                   Default is *''')
+                                   Default is *""")
     deconvolve_parser.add_argument('--skip_prep', default=False,
                                    action='store_true',
-                                   help='''Skips file prep (parsing regressors,
+                                   help="""Skips file prep (parsing regressors,
                                    creating stimulus timing files, censoring)
-                                   before running 3dDeconvolve.''')
+                                   before running 3dDeconvolve.""")
+    deconvolve_parser.add_argument('--censor', default=False,
+                                   action='store_true',
+                                   help="""Forces censoring of files. Program
+                                   will automatically censor if censor file is
+                                   not present. """)
+    deconvolve_parser.add_argument('--parse_regressors', default=False,
+                                   action='store_true',
+                                   help="""Forces parsing of files. Program
+                                   will automatically parse regressors if
+                                   nuisance.1D file is not present. """)
+    deconvolve_parser.add_argument('--use_stimfiles', default=False,
+                                   action='store_true',
+                                   help="""Use stimfiles instead of stim config
+                                   for setting up 3dDeconvolve script.""")
     deconvolve_parser.add_argument('-c', '--columns',  default=[], nargs='*',
                                    dest='columns',
-                                   help='''Enter columns to parse from
+                                   help="""Enter columns to parse from
                                           regressors file into nuisance.1D file for
                                           usage in 3dDeconvolve. Default columns
-                                          will be added automatically.''')
+                                          will be added automatically.""")
     deconvolve_parser.add_argument('--no_default',
                                    default=False,
                                    action='store_true',
-                                   help=f'''Enter flag to not use default
+                                   help=f"""Enter flag to not use default
                                           columns. If not entered, default columns
                                           will be parsed. Default columns are:
-                                          {s.DEFAULT_COLUMNS}''')
+                                          {s.DEFAULT_COLUMNS}""")
     deconvolve_parser.add_argument('--sessions',
                                    nargs='*',
                                    help="""Set the sessions to be analyzed in order.
                                           Default will be all sessions in alphabetical
                                           order""")
+    deconvolve_parser.add_argument('--threshold',
+                                   default=0.2,
+                                   type=float,
+                                   help="""Threshold for censoring. Default is 0.2""")
 
     mema_parser = subparsers.add_parser('3dmema',
                                         parents=[subs, dirs, general, argon],
                                         usage='[STARTING_INDEX][ENDING_INDEX][OPTIONS]',
-                                        help='''''')
+                                        help="""""")
     mema_parser.add_argument('starting_index',
                              default=2,
                              type=int,
-                             help='''''')
+                             help="""""")
     mema_parser.add_argument('ending_index',
                              type=int,
-                             help='''''')
+                             help="""""")
 
     fd_stats_parser = subparsers.add_parser('FD_stats',
                                             parents=[subs, dirs],
                                             usage='[OPTIONS]',
-                                            help='''Calculates FD statistics
-                                            for dataset. Outputs csv with % of
+                                            help="""Calculates FD statistics
+                                            for dataset. Outputs csv with %% of
                                             points over FD threshold anbd FD
-                                            mean for each run and subject.''')
+                                            mean for each run and subject.""")
 
     fd_stats_parser.add_argument('--threshold',
                                  default=0.2,
                                  type=float,
-                                 help='''Threshold for FD motion. Default is 0.2''')
+                                 help="""Threshold for FD motion. Default is 0.2""")
+    fd_stats_parser.add_argument('--sessions',
+                                 nargs='*',
+                                 help="""Set the sessions to be analyzed in order.
+                                          Default will be all sessions in alphabetical
+                                          order""")
 
     return parser
 
@@ -226,32 +243,33 @@ def get_subjects(process, args, dir_tree, completed_subs, numsub=None):
     numsub subjects.
 
     Parameters
-    ----------
-    process : string
+    - ---------
+    process: string
         String denoting the current process
-    args : type
+    args: type
         Command line arguments parsed by ArgumentParser
-    dir_tree : DirectoryTree
+    dir_tree: DirectoryTree
         Class that contains general path info for dataset
-    completed_subs : [Subject]
+    completed_subs: [Subject]
         List of completed subjects found in completed_subjects.txt
-    numsub : int
+    numsub: int
         Number of subjects to get
 
     Returns
-    -------
+    - ------
     [Subject]
         List of subjects in dataset
 
     """
-    subjects = common.Subjects()
-    # get subjects to run and instantiate list of subject objects
-    if hasattr(args, 'rerun') and args.rerun:
-        subjects = common.read_file_subargs(
-            dir_tree.process_dir + s.LOGS_DIR + s.FAILED_SUB_FILE,
-            dir_tree, num=numsub)
+    # set directory from which to get subjects
+    if process == s.FMRIPREP or process == s.MRIQC:
+        sub_dir = dir_tree.bids_dir
+    elif process == s.DECONVOLVE or process == s.FD_STATS:
+        sub_dir = dir_tree.fmriprep_dir
 
-    elif hasattr(args, 'rerun_mem') and args.rerun_mem:
+    subjects = common.Subjects()
+
+    if hasattr(args, 'rerun_mem') and args.rerun_mem:
         subjects = common.read_file_subargs(
             dir_tree.process_dir + s.LOGS_DIR + s.FAILED_SUB_MEM_FILE,
             dir_tree, num=numsub)
@@ -260,67 +278,21 @@ def get_subjects(process, args, dir_tree, completed_subs, numsub=None):
             args.mem = 'mem_256G=true'
 
     elif process == s.HEUDICONV:
-        subjects = temp_get_raw_subjects(dir_tree, completed_subs=completed_subs,
-                                         num=numsub)
-
+        subjects = get_raw_subjects(dir_tree, completed_subs=completed_subs,
+                                    num=numsub)
+        #
     elif args.subjects is None:
-        subjects = common.get_subjects(dir_tree, completed_subs=completed_subs,
+        subjects = common.get_subjects(sub_dir, dir_tree,
+                                       completed_subs=completed_subs,
                                        num=numsub)
-
+    # subjects entered in command line
     else:
         subjects = common.subargs_to_subjects(args.subjects, dir_tree)
 
+    if len(subjects) == 0:
+        raise Exception('No subjects found.')
+
     return subjects
-
-
-def temp_get_raw_subjects(dir_tree, num=None, completed_subs=common.Subjects()):
-    dirs = os.listdir(dir_tree.raw_dir)
-    zipped_dirs = sorted([dir for dir in dirs if '.zip' in dir])
-    unzipped_dirs = sorted([dir for dir in dirs
-                            if len(dir) > 8 and 'zip' not in dir])
-    symbolic_links = sorted([dir for dir in dirs if len(dir) == 5])
-
-    # gets latest zipped data that needs to be converted
-    zips_to_run = []
-    for zip in zipped_dirs:
-        needs_zipping = True
-        for unzip in unzipped_dirs:
-            if zip.replace('.zip', '') in unzip:
-                needs_zipping = False
-                break
-        if needs_zipping:
-            zips_to_run.append(zip)
-
-    # get subjects that have been unzipped and a symbolic link created, but are
-    # not yet complete
-    subjects = [sub for sub in symbolic_links
-                if sub not in completed_subs.to_subargs_list()]
-
-    for zip in zips_to_run:
-        df = pd.read_csv(dir_tree.raw_dir + 'config.csv')
-        dict = df.set_index('Zip').T.to_dict('list')
-        subject = int(dict[zip][0])
-
-        print(f'Uzipping {zip}')
-        with zipfile.ZipFile(dir_tree.raw_dir + zip, mode='r') as zip_ref:
-            zip_ref.extractall(path=dir_tree.raw_dir)
-        unzipped_dir = max(glob.iglob(
-            f'{dir_tree.raw_dir}*'), key=os.path.getctime)
-        final_unzipped_dir = f'{dir_tree.raw_dir}{zip.replace(".zip", "___")}{str(subject)}'
-        os.rename(unzipped_dir, final_unzipped_dir)
-        print(f'Unzipped {zip} to {final_unzipped_dir}')
-
-        symbolic_link_dir = dir_tree.raw_dir + str(subject)
-        print(
-            f'Created symbolic link {symbolic_link_dir} for {final_unzipped_dir}')
-        os.symlink(final_unzipped_dir, symbolic_link_dir)
-        subjects.append(str(subject))
-        subject += 1
-
-    if num:
-        subjects = subjects[:num]
-
-    return common.subargs_to_subjects(subjects, dir_tree)
 
 
 def get_raw_subjects(dir_tree, num=None, completed_subs=common.Subjects()):
@@ -396,20 +368,18 @@ def run_stack(process, args, dir_tree, completed_subs):
         args.hold_jid = run_process(
             process, args, dir_tree, subjects)
 
-    print('Finished stack successfully.')
+    print("Finished stack successfully.")
 
 
 def run_process(process, args, dir_tree, subjects):
-    '''
+    """
     Create final bashfile for process. Runs bashfile on host. If on thalamege,
     will wait for process to complete. All subjects will run asynchronously.
     Returns: (str) Job ID when submitted on argon.
-    '''
+    """
     # create base bashfile with options for hpc computing
     if process == s.FD_STATS:
-        print('hell0')
-        motion.print_FD_stats(dir_tree, subjects,
-                              bids_dir=args.bids_dir, threshold=args.threshold)
+        motion.print_FD_stats(dir_tree, subjects, threshold=args.threshold)
         exit()
 
     base_bashfile = bashwriter.Bashfile(f'{dir_tree.dataset_name}_{process}',
@@ -424,7 +394,7 @@ def run_process(process, args, dir_tree, subjects):
 
 
 def prep_bashfile(process, args, dir_tree, subjects, base_bashfile):
-    '''Replaces options in base bashfile to create new'''
+    """Replaces options in base bashfile to create new"""
     options = None
     bashfile_path = ''
 
@@ -450,7 +420,6 @@ def prep_bashfile(process, args, dir_tree, subjects, base_bashfile):
 
     # 3dDeconvolve
     elif process == s.DECONVOLVE:
-        bashfile_path = s.DECONVOLVE_BASHFILE
 
         # add default columns, avoiding duplicates
         if not args.no_default:
@@ -471,13 +440,15 @@ def prep_bashfile(process, args, dir_tree, subjects, base_bashfile):
                 if not os.path.isdir(subject.deconvolve_dir):
                     os.mkdir(subject.deconvolve_dir)
 
-                prep_3d.parse_regressors(subject, args.columns)
-                prep_3d.create_stimfiles(subject, args.timing_file_dir,
-                                         args.stimulus_header,
-                                         args.timing_header, args.file_wc)
+                prep_3d.parse_regressors(subject, args.columns, args.censor,
+                                         args.parse_regressors, args.threshold)
+                stimfiles = prep_3d.create_stimfiles(subject, args.timing_file_dir,
+                                                     args.stimulus_header,
+                                                     args.timing_header, args.file_wc)
 
+        qsub_3d.write_qsub(base_bashfile, dir_tree,
+                           stimfiles, args.use_stimfiles)
         exit()
-        qsub_3d.write_qsub(base_bashfile, dir_tree)
 
     # 3dMEMA
     elif process == s.MEMA:
@@ -617,8 +588,11 @@ def main():
                 'Unrecognized server host. Must be Thalamege or Argon.')
 
         # Create directory tree, contains commonly used dataset paths
-        dir_tree = common.DirectoryTree(args.dataset_dir, args.bids_dir,
-                                        args.work_dir)
+        dir_tree = common.DirectoryTree(args.dataset_dir,
+                                        bids_dir=args.bids_dir,
+                                        work_dir=args.work_dir,
+                                        sessions=args.sessions if
+                                        hasattr(args, 'sessions') else None)
 
         # set and create process directory and relevant sub directories
         # HEUDICONV process dir is the raw dir

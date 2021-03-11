@@ -60,9 +60,9 @@ COMPLETED_SUBS_FILE = 'completed_subjects.txt'
 DEFAULT_COLUMNS = ['csf', 'white_matter',  'trans_x',
                    'trans_y', 'trans_z', 'rot_x', 'rot_y', 'rot_z']
 REGRESSOR_FILE = 'nuisance.1D'
-REGRESSOR_WC = 'regressors.tsv'
+REGRESSOR_WC = '*regressors.tsv'
 CENSOR_FILE = 'censor.1D'
-EVENTS_WC = 'events.tsv'
+EVENTS_WC = '*events.tsv'
 STIM_CONFIG = 'stim_config.csv'
 BUCKET_FILE = 'FIRmodel_MNI_stats'
 BUCKET_FILE_BRIK = BUCKET_FILE + '+tlrc.BRIK'

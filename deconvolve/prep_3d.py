@@ -9,12 +9,11 @@ import numpy as np
 import glob as glob
 
 # Classes
-
-
 class Stimfile:
     def __init__(self, task_name, sub_deconvolve_dir):
         self.name = task_name
-        self.filepath = f"{sub_deconvolve_dir}{task_name}.1D.txt"
+        self.file = f'{task_name}.1D.txt'
+        self.filepath = f"{sub_deconvolve_dir}{self.file}"
         self.runs = list()
 
     def write_file(self):
@@ -32,39 +31,34 @@ class Run:
         self.timing_list = list()
 
 
-# Functions
-def init_argparse() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        usage="[SUBCOMMAND][OPTIONS] ... ",
-        description="Run pre-processing on whole dataset or selected subjects")
-    subparsers = parser.add_subparsers(title='subcommands', required=True,
-                                       dest='subcommand')
-
-    parser_stimfiles = subparsers.add_parser('stimfiles', help='''Create
-    stimulus timing files for model. Gets info from config file in 3dDeconvolve
-    directory. Check out MDTB's directory for an example.''')
-
-    parser_regressor_col = subparsers.add_parser('3dmema',
-                                                 usage='[DATASET_DIR][OPTIONS]',
-                                                 help='''Parse regressor files
-                                                 to extract columns and censor
-                                                 motion.''')
-    parser_regressor_col.add_argument('dataset_dir',
-                                      help="Base directory of dataset.")
-
-    return parser
-
-
-def parse_regressors(subject, columns):
+def parse_regressors(subject, columns, censor, parse_regressors, threshold):
     """Appends specified columns from regressor files and writes combined output
      file. Input: Subject (subject object), Columns (list str)"""
-    print(f'\n\nParsing regressor files for subject {subject.name}')
-
-    output_df = pd.DataFrame()
+    regressor_filepath = subject.deconvolve_dir + s.REGRESSOR_FILE
+    censor_filepath = subject.deconvolve_dir + s.CENSOR_FILE
     output_censor = []
-    files = common.get_ses_files(subject.sessions,
-                                 f"{subject.fmriprep_dir}{bs.SESSION}/{bs.FUNC_DIR}*{s.REGRESSOR_WC}")
+    output_df = pd.DataFrame()
 
+    if not os.path.exists(subject.deconvolve_dir):
+        os.makedirs(subject.deconvolve_dir)
+    elif os.path.exists(regressor_filepath) and not parse_regressors:
+        print(f'\n\nSkipping: Subject {subject.name} already has nuisance '
+        'regressor file. To overwrite use the -parse_regressors flag.')
+    else:
+        print(f'\n\nParsing regressor files for subject {subject.name} in '
+        f'{subject.deconvolve_dir}')
+        parse_regressors = True
+
+    # censor if censor file does not exist
+    if os.path.exists(censor_filepath) and not censor:
+        print('''Skipping: Subject already has censoring.''')
+    else:
+        censor = True
+
+    if not parse_regressors and not censor:
+        return
+
+    files = common.get_ses_files(subject, subject.fmriprep_dir, s.REGRESSOR_WC)
     if not files:
         warnings.warn(f'Subject {subject.name} has no regressor files')
         return
@@ -72,16 +66,14 @@ def parse_regressors(subject, columns):
         print(f'Parsing: {file.split("/")[-1]}')
         df = pd.read_csv(file, sep="\t")
         output_df = output_df.append(df[columns])
-        output_censor.extend(censor_motion(df))
+        if censor:
+            output_censor.extend(censor_motion(df, threshold=threshold))
 
-    if not os.path.exists(subject.deconvolve_dir):
-        os.makedirs(subject.deconvolve_dir)
 
-    regressor_filepath = subject.deconvolve_dir + s.REGRESSOR_FILE
     print(f'Writing regressor file to {regressor_filepath}')
-    output_df.to_csv(regressor_filepath, header=False, index=False, sep="\t")
+    output_df.to_csv(regressor_filepath, header=False,
+                     index=False, sep="\t")
 
-    censor_filepath = subject.deconvolve_dir + s.CENSOR_FILE
     print(f'Writing censor file to {censor_filepath}')
     with open(censor_filepath, 'w') as file:
         for num in output_censor:
@@ -90,7 +82,7 @@ def parse_regressors(subject, columns):
           'and censored motion')
 
 
-def censor_motion(df):
+def censor_motion(df, threshold=0.2):
     censor_vector = []
     prev_motion = None
 
@@ -100,7 +92,7 @@ def censor_motion(df):
             censor_vector.append(0)
             continue
 
-        if row[0] > 0.2:
+        if row[0] > threshold:
             censor_vector.append(0)
             prev_motion = index
         elif prev_motion is not None and (prev_motion + 1 == index or prev_motion + 2 == index):
@@ -118,9 +110,9 @@ def create_stimfiles(subject, run_file_dir, stimulus_header, timing_header,
                      file_WC):
     print(f'\nCreating stimulus files for subject {subject.name}')
 
-    files = common.get_ses_files(subject.sessions,
-                                 f"{run_file_dir}{bs.SESSION}/*{subject.name}{file_WC}")
+    files = common.get_ses_files(subject, run_file_dir, file_WC)
     print(f'Run data files: {files}\n')
+
     if all([x.endswith('.tsv') for x in files]):
         seperator = '\t'
     elif all([x.endswith('.csv') for x in files]):
@@ -137,6 +129,7 @@ def create_stimfiles(subject, run_file_dir, stimulus_header, timing_header,
         print(f'Writing stimulus file: {stimfile.name}')
         stimfile.write_file()
 
+    return stimfiles
 
 def inst_stimfiles(deconvolve_dir, stimulus_header, run_files, seperator):
     stimfiles = list()
@@ -144,13 +137,14 @@ def inst_stimfiles(deconvolve_dir, stimulus_header, run_files, seperator):
     for run_file in run_files:
         # load event timing tsv files
         run_df = pd.read_csv(run_file, sep=seperator)
+
+        # make new stimfile for each unique task
         for stimulus_type in zip(run_df[stimulus_header]):
-            # make new stimfile for each unique task
-            stimfile = next(
-                (x for x in stimfiles if x.name == stimulus_type[0]), None)
+            # get rid of numbers in string
+            stim_string = ''.join(i for i in stimulus_type[0] if not i.isdigit())
+            stimfile = next((x for x in stimfiles if x.name == stim_string), None)
             if stimfile is None:
-                stimfiles.append(
-                    Stimfile(stimulus_type[0], deconvolve_dir))
+                stimfiles.append(Stimfile(stim_string, deconvolve_dir))
     return stimfiles
 
 
@@ -167,7 +161,7 @@ def generate_stimfiles(stimfiles, run_files, stimulus_header, timing_header,
 
         # append time to stimfile with associated task
         for row in zip(run_df[stimulus_header], run_df[timing_header]):
-            task_type = row[0]
+            task_type = ''.join(i for i in row[0] if not i.isdigit())
             task_time = row[1]
             stimfile = next(
                 (x for x in stimfiles if x.name == task_type), Exception)

@@ -1,0 +1,20 @@
+#!/bin/bash
+subject_dir='/Shared/lss_kahwang_hpc/data/MDTB/fmriprep/sub-02/ses-a1/func/'
+output_path='/Shared/lss_kahwang_hpc/data/MDTB/3dDeconvolve/sub-02/'
+
+
+singularity run --cleanenv \
+/Shared/lss_kahwang_hpc/opt/afni/afni.sif \
+3dDeconvolve -input $(ls ${subject_dir}*desc-preproc_bold.nii.gz | sort -V) \
+-mask ${subject_dir}sub-02_ses-a1_task-a_run-4_space-MNI152NLin2009cAsym_desc-brain_mask.nii.gz \
+-polort A \
+-ortvec ${output_path}/nuisance.1D \
+-local_times \
+-rout \
+-tout \
+-bucket ${output_path}/sub-02_FIRmodel_MNI_stats \
+-errts ${output_path}/sub-02_FIRmodel_errts.nii.gz \
+-noFDR \
+-nocout \
+-jobs 4 \
+-ok_1D_text

@@ -2,13 +2,6 @@
 # SGE OPTIONS
 SGE_OPTIONS
 
-# Functions
-remove_localscratch_files () {
-  if [[ $1 =~ "localscratch" ]]; then
-    rm  -r $1
-  fi
-}
-
 # BASE SCRIPT
 BASE_SCRIPT
 
@@ -18,6 +11,8 @@ slots=SLOTS
 bids_dir=BIDS_DIR
 singularity_path=/Shared/lss_kahwang_hpc/opt/mriqc/mriqc.simg
 working_dir=WORK_DIR
+is_failed=false
+logs_dir=${mriqc_dir}logs/
 
 echo dataset_dir: $dataset_dir
 echo mriqc_dir: $mriqc_dir
@@ -45,17 +40,22 @@ participant --participant_label ${subject} \
 OPTIONS
 } ||
 {
-  remove_localscratch_files $working_dir
-  if [ grep -Fxq "A process in the process pool was terminated abruptly while the future was running or pending." EFILE ]
-  then
-    echo $subject >> ${mriqc_dir}logs/mem_failed_subjects.txt
-    exit 137
-  else
-    echo $subject >> ${mriqc_dir}logs/failed_subjects.txt
-    exit 1
+  # when erorr is thrown
+  is_failed=true
+  if grep -Fq "A process in the process pool was terminated abruptly while the future was running or pending." $SGE_STDERR_PATH; then
+    echo $subject >> ${logs_dir}mem_failed_subjects.txt
+  elif ! grep -Fq $subject ${logs_dir}failed_subjects.txt; then
+    echo $subject >> ${logs_dir}failed_subjects.txt
   fi
 }
-#####End Compute Work#####
 
+if [ "$is_failed" = false ]; then
+  echo $subject >> ${logs_dir}completed_subjects.txt
+fi
+
+mv -u $SGE_STDOUT_PATH ${logs_dir}${subject}.o
+mv -u $SGE_STDERR_PATH ${logs_dir}${subject}.e
 remove_localscratch_files $working_dir
-echo $subject >> ${mriqc_dir}logs/completed_subjects.txt
+/bin/echo Finished on: `date`
+
+#####End Compute Work#####
