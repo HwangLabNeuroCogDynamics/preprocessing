@@ -1,20 +1,34 @@
 #!/bin/bash
-# SGE OPTIONS
-SGE_OPTIONS
+# SGE 
+#$ -N IBC_fmriprep
+#$ -q SEASHORE
+#$ -pe smp 15
+#$ -t 1-5
+#$ -ckpt user
 
 # BASE SCRIPT
-BASE_SCRIPT
+/bin/echo Running on compute node: `hostname`.
+/bin/echo Job: $JOB_ID
+/bin/echo Task: $SGE_TASK_ID
+/bin/echo In directory: `pwd`
+/bin/echo Starting on: `date`
+
+
+subjects=(01 07 08 14 15) 
+echo subjects: ${subjects[@]}
+echo total_subjects=${#subjects[@]}
+subject="${subjects[$SGE_TASK_ID-1]}"
 
 FMRIPREP='fmriprep/'
 FREESURFER='freesurfer/'
 BIDS='BIDS/'
-
-dataset_name=DATASET_NAME
-dataset_dir=DATASET_DIR
-slots=SLOTS
-bids_dir=BIDS_DIR
+dataset_name=IBC
+dataset_dir=/Shared/lss_kahwang_hpc/data/IBC/
+slots=15
+bids_dir=/Shared/lss_kahwang_hpc/data/IBC/BIDS/
 singularity_path=/Shared/lss_kahwang_hpc/opt/${FMRIPREP}fmriprep-20.1.1.simg
-use_localscratch=true
+use_localscratch=false
+mem=$((9 * slots))
 
 freesurfer_lic=/Shared/lss_kahwang_hpc/opt/${FREESURFER}license.txt
 fmriprep_dir=${dataset_dir}${FMRIPREP}
@@ -22,12 +36,16 @@ freesurfer_dir=${dataset_dir}${FREESURFER}
 freesurfer_sub_dir=${dataset_dir}${FREESURFER}sub-${subject}/
 fmriprep_sub_dir=${dataset_dir}${FMRIPREP}sub-${subject}/
 
-if [ "$use_localscratch" = true]; then
-  working_dataset_dir=${TMPDIR}/
-  working_dir=${TMPDIR}/work/
-  working_bids_dir=${TMPDIR}/${BIDS}
-  working_fmriprep_dir=${TMPDIR}/${FMRIPREP}
-  working_freesurfer_dir=${TMPDIR}/${FREESURFER}
+if [ "$use_localscratch" = true ]; then
+  working_dataset_dir=${TMPDIR}
+  working_dir=${TMPDIR}work/
+  working_bids_dir=${TMPDIR}${BIDS}
+  working_fmriprep_dir=${TMPDIR}${FMRIPREP}
+  working_freesurfer_dir=${TMPDIR}${FREESURFER}
+  mkdir $working_dir
+  mkdir $working_bids_dir
+  mkdir $working_fmriprep_dir
+  mkdir $working_freesurfer_dir
 else
   working_dataset_dir=${dataset_dir}
   working_dir=${dataset_dir}work/
@@ -47,13 +65,6 @@ echo temp_dir: $TMPDIR
 echo working_fmriprep_dir: $working_fmriprep_dir
 echo working_freesurfer_dir: $working_freesurfer_dir
 echo freesurfer_license: $freesurfer_lic
-
-
-mkdir $working_dir
-mkdir $working_dataset_dir
-mkdir $working_bids_dir
-mkdir $working_fmriprep_dir
-mkdir $working_freesurfer_dir
 
 echo Starting fmriprep on $subject
 
@@ -126,36 +137,25 @@ participant --participant_label $subject \
 --nthreads $slots --omp-nthreads $slots \
 -w $working_dir \
 --fs-license-file ${freesurfer_lic} \
---mem $slots \
---skip_bids_validation \
-OPTIONS
-
+--mem $mem \
+--skip_bids_validation
 } ||
 {
   # when error is thrown
   is_failed=true
   if grep -Fq "A process in the process pool was terminated abruptly while the future was running or pending." $SGE_STDERR_PATH; then
-    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
     echo $subject >> ${logs_dir}mem_failed_subjects.txt
   elif ! grep -Fq $subject ${logs_dir}failed_subjects.txt; then
-    sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
     echo $subject >> ${logs_dir}failed_subjects.txt
   fi
 }
 
 if [ "$is_failed" = false ]; then
-  sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
-  sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
-  sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
   echo $subject >> ${logs_dir}completed_subjects.txt
 fi
 
-# move fmriprep, freesurfer, and stdout/err files to dataset dir
-cp -r $working_dir $dataset_dir
-cp -r $working_fmriprep_dir $dataset_dir
-cp -r $working_freesurfer_dir $dataset_dir
-
+/bin/echo Finished on: `date`
 mv -u $SGE_STDOUT_PATH ${logs_dir}${subject}.o
 mv -u $SGE_STDERR_PATH ${logs_dir}${subject}.e
-/bin/echo Finished on: `date`
+
 #####End Compute Work#####

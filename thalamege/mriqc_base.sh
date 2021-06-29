@@ -10,7 +10,7 @@ bids_dir=BIDS_DIR
 singularity_path=/opt/mriqc/mriqc.simg
 working_dir=WORK_DIR
 logs_dir=${dataset_dir}mriqc/logs/
-is_finished=false
+is_failed=false
 
 echo dataset_dir: $dataset_dir
 echo mriqc_dir: $mriqc_dir
@@ -37,24 +37,22 @@ do
     --n_procs ${slots} --ants-nthreads ${slots} \
     -w ${working_dir} \
     OPTIONS
-
-    is_finished=true
   } ||
   {
-    echo "Error when running mriqc"
+    # when error is thrown
+    is_failed=true
+    echo "$subject failed. Check logs for more information."
+    
+    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+    echo $subject >> ${logs_dir}failed_subjects.txt
   }
   ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e"
 
-  if [ "$is_finished" = true ]; then
+  if [ "$is_failed" = false ]; then
     echo "$subject successfully completed."
     sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
     sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
     echo $subject >> ${logs_dir}completed_subjects.txt
-  else
-    echo "$subject failed. Check logs for more information."
-    # when error is thrown
-    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
-    echo $subject >> ${logs_dir}failed_subjects.txt
   fi
   } &
 done

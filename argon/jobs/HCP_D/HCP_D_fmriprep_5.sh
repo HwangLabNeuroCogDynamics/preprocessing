@@ -1,18 +1,35 @@
 #!/bin/bash
-# SGE OPTIONS
-SGE_OPTIONS
+# SGE 
+#$ -N HCP_D_fmriprep
+#$ -q SEASHORE
+#$ -pe smp 4
+#$ -o /localscratch/Users/esorenson/$JOB_NAME_$TASK_ID.o
+#$ -e /localscratch/Users/esorenson/$JOB_NAME_$TASK_ID.e
+#$ -t 1-23
+#$ -ckpt user
+export OMP_NUM_THREADS=4
 
 # BASE SCRIPT
-BASE_SCRIPT
+/bin/echo Running on compute node: `hostname`.
+/bin/echo Job: $JOB_ID
+/bin/echo Task: $SGE_TASK_ID
+/bin/echo In directory: `pwd`
+/bin/echo Starting on: `date`
+
+
+subjects=(0039128 0069238 0125424 0154431 0330021 0336841 0338441 0338744 0353538 0462341 0605135 0643345 0667763 0682557 1410933 1464653 1534244 1553551 1568867 1578365 1646154 2046842 2062537)
+echo subjects: ${subjects[@]}
+echo total_subjects=${#subjects[@]}
+subject="${subjects[$SGE_TASK_ID-1]}"
 
 FMRIPREP='fmriprep/'
 FREESURFER='freesurfer/'
 BIDS='BIDS/'
 
-dataset_name=DATASET_NAME
-dataset_dir=DATASET_DIR
-slots=SLOTS
-bids_dir=BIDS_DIR
+dataset_name=HCP_D
+dataset_dir=/Shared/lss_kahwang_hpc/data/HCP_D/
+slots=4
+bids_dir=/Dedicated/inc_data/bigdata/hcpd/rawdata/
 singularity_path=/Shared/lss_kahwang_hpc/opt/${FMRIPREP}fmriprep-20.1.1.simg
 use_localscratch=true
 
@@ -22,7 +39,7 @@ freesurfer_dir=${dataset_dir}${FREESURFER}
 freesurfer_sub_dir=${dataset_dir}${FREESURFER}sub-${subject}/
 fmriprep_sub_dir=${dataset_dir}${FMRIPREP}sub-${subject}/
 
-if [ "$use_localscratch" = true]; then
+if [ "$use_localscratch" = true ]; then
   working_dataset_dir=${TMPDIR}/
   working_dir=${TMPDIR}/work/
   working_bids_dir=${TMPDIR}/${BIDS}
@@ -64,7 +81,7 @@ if [ "$use_localscratch" = true ]; then
   cp -r ${bids_dir}sub-${subject}/ $working_bids_dir
 
   # special case for HCP_D data
-  if [[ $bids_dir =~ "/Dedicated/inc_data/HCP_D" ]]; then
+  if [[ $bids_dir =~ "/Dedicated/inc_data/bigdata/hcpd" ]]; then
     ls $working_bids_dir
     cd ${working_bids_dir}sub-${subject}
     cd ${working_bids_dir}sub-${subject}/fmap/
@@ -126,9 +143,9 @@ participant --participant_label $subject \
 --nthreads $slots --omp-nthreads $slots \
 -w $working_dir \
 --fs-license-file ${freesurfer_lic} \
---mem $slots \
+--mem $((9 * $slots)) \
 --skip_bids_validation \
-OPTIONS
+
 
 } ||
 {
@@ -151,10 +168,8 @@ if [ "$is_failed" = false ]; then
 fi
 
 # move fmriprep, freesurfer, and stdout/err files to dataset dir
-cp -r $working_dir $dataset_dir
 cp -r $working_fmriprep_dir $dataset_dir
 cp -r $working_freesurfer_dir $dataset_dir
-
 mv -u $SGE_STDOUT_PATH ${logs_dir}${subject}.o
 mv -u $SGE_STDERR_PATH ${logs_dir}${subject}.e
 /bin/echo Finished on: `date`

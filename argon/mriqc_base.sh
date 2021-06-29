@@ -31,7 +31,7 @@ if [[ $bids_dir =~ "/Dedicated/inc_data/" ]]; then
 fi
 
 {
-singularity run --cleanenv -B ${dataset_dir}:/data $singularity_path \
+singularity run --cleanenv -B ${dataset_dir}:/data ${singularity_path} \
 ${bids_dir} \
 ${mriqc_dir} \
 participant --participant_label ${subject} \
@@ -40,22 +40,21 @@ participant --participant_label ${subject} \
 OPTIONS
 } ||
 {
-  # when erorr is thrown
+  # when error is thrown
   is_failed=true
-  if grep -Fq "A process in the process pool was terminated abruptly while the future was running or pending." $SGE_STDERR_PATH; then
-    echo $subject >> ${logs_dir}mem_failed_subjects.txt
-  elif ! grep -Fq $subject ${logs_dir}failed_subjects.txt; then
-    echo $subject >> ${logs_dir}failed_subjects.txt
-  fi
+  echo "$subject failed. Check logs for more information."
+  
+  sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+  echo $subject >> ${logs_dir}failed_subjects.txt
 }
 
 if [ "$is_failed" = false ]; then
+  sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+  sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
   echo $subject >> ${logs_dir}completed_subjects.txt
 fi
 
 mv -u $SGE_STDOUT_PATH ${logs_dir}${subject}.o
 mv -u $SGE_STDERR_PATH ${logs_dir}${subject}.e
-remove_localscratch_files $working_dir
 /bin/echo Finished on: `date`
-
 #####End Compute Work#####

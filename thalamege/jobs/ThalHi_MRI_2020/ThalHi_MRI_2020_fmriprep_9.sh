@@ -2,23 +2,21 @@
 
 # BASE SCRIPT
 /bin/echo Running on compute node: `hostname`.
-/bin/echo Job: $JOB_ID
-/bin/echo Task: $SGE_TASK_ID
 /bin/echo In directory: `pwd`
 /bin/echo Starting on: `date`
 
 
-subjects=(10017 10016)
+subjects=(10027 10028 10029 10030)
 echo subjects: ${subjects[@]}
 
 dataset_dir=/data/backed_up/shared/ThalHi_MRI_2020/
 slots=16
 bids_dir=/data/backed_up/shared/ThalHi_MRI_2020/BIDS/
-singularity_path=/opt/fmriprep-20.1.1/fmriprep.simg
+singularity_path=/opt/fmriprep/fmriprep.simg
 working_dir=/data/backed_up/shared/ThalHi_MRI_2020/work/
 freesurfer_lic=/opt/freesurfer/license.txt
 logs_dir=${dataset_dir}fmriprep/logs/
-is_finished=false
+is_failed=false
 
 echo dataset_dir: $dataset_dir
 echo slots: $slots
@@ -31,7 +29,8 @@ for subject in "${subjects[@]}"
 do
   {
   echo Starting fmriprep on $subject
-  ( echo Starting fmriprep on $subject
+  (
+  echo Starting fmriprep on $subject
 
   if [ -f ${dataset_dir}freesurfer/sub-${subject}/scripts/IsRunning.lh+rh ]; then
     rm ${dataset_dir}freesurfer/sub-${subject}/scripts/IsRunning.lh+rh
@@ -39,41 +38,29 @@ do
 
   # run fmriprep singularity container
   {
-  singularity run --cleanenv -B $dataset_dir $singularity_path \
-  $bids_dir \
-  $dataset_dir \
-  participant --participant_label $subject \
-  --nthreads $slots --omp-nthreads $slots \
-  -w $working_dir \
-  --fs-license-file $freesurfer_lic \
-  --skip-bids-validation \
-  
-
-  is_finished=true
+    singularity run --cleanenv -B $dataset_dir $singularity_path \
+    $bids_dir \
+    $dataset_dir \
+    participant --participant_label $subject \
+    --nthreads $slots --omp-nthreads $slots \
+    -w $working_dir \
+    --fs-license-file $freesurfer_lic \
+    --skip-bids-validation \
+    
   } ||
   {
     # when error is thrown
-    if [ grep -Fxq "A process in the process pool was terminated abruptly while the future was running or pending."  ]; then
-      sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
-      echo $subject >> ${logs_dir}mem_failed_subjects.txt
-    else
-      sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
-      echo $subject >> ${logs_dir}failed_subjects.txt
-    fi
+    is_failed=true
+    echo "$subject failed. Check logs for more information."
+    
+    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+    echo $subject >> ${logs_dir}failed_subjects.txt
   }
   ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e"
 
-  if [ "$is_finished" = true ]; then
-
-  fi
-
-
-  if [ "$is_finished" = false ]; then
-    echo "fmriprep for $subject failed. Check logs for more information."
-  else
-    echo "fmriprep for $subject successfully completed."
+  if [ "$is_failed" = false ]; then
+    echo "$subject successfully completed."
     sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
-    sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
     sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
     echo $subject >> ${logs_dir}completed_subjects.txt
   fi

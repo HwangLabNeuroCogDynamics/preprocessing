@@ -8,7 +8,7 @@
 /bin/echo Starting on: `date`
 
 
-subjects=(10016 10017 10018 10019 10020 10021 10022 10023 10024 10025 10026)
+subjects=(10037 10040)
 echo subjects: ${subjects[@]}
 
 dataset_dir=/data/backed_up/shared/ThalHi_MRI_2020/
@@ -18,6 +18,7 @@ bids_dir=/data/backed_up/shared/ThalHi_MRI_2020/BIDS/
 singularity_path=/opt/mriqc/mriqc.simg
 working_dir=/data/backed_up/shared/ThalHi_MRI_2020/work/
 logs_dir=${dataset_dir}mriqc/logs/
+is_failed=false
 
 echo dataset_dir: $dataset_dir
 echo mriqc_dir: $mriqc_dir
@@ -44,25 +45,22 @@ do
     --n_procs ${slots} --ants-nthreads ${slots} \
     -w ${working_dir} \
     
-
   } ||
   {
-    # when erorr is thrown
+    # when error is thrown
     is_failed=true
+    echo "$subject failed. Check logs for more information."
+    
     sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
     echo $subject >> ${logs_dir}failed_subjects.txt
   }
+  ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e"
 
   if [ "$is_failed" = false ]; then
+    echo "$subject successfully completed."
     sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
     sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
     echo $subject >> ${logs_dir}completed_subjects.txt
-  fi ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e"
-
-  if [ "$is_failed" = true ]; then
-    echo "$subject failed. Check logs for more information."
-  else
-    echo "$subject successfully completed."
   fi
   } &
 done

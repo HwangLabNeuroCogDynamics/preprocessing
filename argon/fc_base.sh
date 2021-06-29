@@ -5,36 +5,9 @@ SGE_OPTIONS
 # BASE SCRIPT
 BASE_SCRIPT
 
-FMRIPREP='fmriprep/'
-FREESURFER='freesurfer/'
-BIDS='BIDS/'
-
 dataset_name=DATASET_NAME
 dataset_dir=DATASET_DIR
 slots=SLOTS
-bids_dir=BIDS_DIR
-singularity_path=/Shared/lss_kahwang_hpc/opt/${FMRIPREP}fmriprep-20.1.1.simg
-use_localscratch=true
-
-freesurfer_lic=/Shared/lss_kahwang_hpc/opt/${FREESURFER}license.txt
-fmriprep_dir=${dataset_dir}${FMRIPREP}
-freesurfer_dir=${dataset_dir}${FREESURFER}
-freesurfer_sub_dir=${dataset_dir}${FREESURFER}sub-${subject}/
-fmriprep_sub_dir=${dataset_dir}${FMRIPREP}sub-${subject}/
-
-if [ "$use_localscratch" = true]; then
-  working_dataset_dir=${TMPDIR}/
-  working_dir=${TMPDIR}/work/
-  working_bids_dir=${TMPDIR}/${BIDS}
-  working_fmriprep_dir=${TMPDIR}/${FMRIPREP}
-  working_freesurfer_dir=${TMPDIR}/${FREESURFER}
-else
-  working_dataset_dir=${dataset_dir}
-  working_dir=${dataset_dir}work/
-  working_bids_dir=${dataset_dir}${BIDS}
-  working_fmriprep_dir=${dataset_dir}${FMRIPREP}
-  working_freesurfer_dir=${dataset_dir}${FREESURFER}
-fi
 
 logs_dir=${fmriprep_dir}logs/
 is_failed=false
@@ -126,7 +99,7 @@ participant --participant_label $subject \
 --nthreads $slots --omp-nthreads $slots \
 -w $working_dir \
 --fs-license-file ${freesurfer_lic} \
---mem $slots \
+--mem $SLOTS \
 --skip_bids_validation \
 OPTIONS
 
@@ -134,28 +107,12 @@ OPTIONS
 {
   # when error is thrown
   is_failed=true
-  if grep -Fq "A process in the process pool was terminated abruptly while the future was running or pending." $SGE_STDERR_PATH; then
-    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
-    echo $subject >> ${logs_dir}mem_failed_subjects.txt
-  elif ! grep -Fq $subject ${logs_dir}failed_subjects.txt; then
-    sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
-    echo $subject >> ${logs_dir}failed_subjects.txt
-  fi
+  echo "$subject failed. Check logs for more information."
+  sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+  echo $subject >> ${logs_dir}failed_subjects.txt
 }
 
 if [ "$is_failed" = false ]; then
-  sed -i "/${subject}/d" ${logs_dir}mem_failed_subjects.txt
   sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
-  sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
   echo $subject >> ${logs_dir}completed_subjects.txt
 fi
-
-# move fmriprep, freesurfer, and stdout/err files to dataset dir
-cp -r $working_dir $dataset_dir
-cp -r $working_fmriprep_dir $dataset_dir
-cp -r $working_freesurfer_dir $dataset_dir
-
-mv -u $SGE_STDOUT_PATH ${logs_dir}${subject}.o
-mv -u $SGE_STDERR_PATH ${logs_dir}${subject}.e
-/bin/echo Finished on: `date`
-#####End Compute Work#####
