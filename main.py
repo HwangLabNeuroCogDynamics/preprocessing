@@ -1,11 +1,11 @@
-from thalpy import base
+from thalpy import base, regressors
 from thalpy.constants import paths, wildcards
 
 import os
 import argparse
 import subprocess
 from lib import bashwriter
-from deconvolve import prep_3d, qsub_3d
+from deconvolve import stimfiles, qsub_3d
 from fmriprep import qsub_fmriprep
 from FD_stats import motion
 import settings as s
@@ -22,7 +22,7 @@ import pandas as pd
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run pre-processing on whole dataset or selected subjects",
-        usage="[SUBJECT_DIRECTORY] [OPTIONS] [SUBCOMMANDS] ... ",
+        usage="[DATASET_DIR] [SUBCOMMANDS [OPTIONS]]",
         add_help=False,
     )
 
@@ -42,7 +42,7 @@ def init_argparse() -> argparse.ArgumentParser:
         "--numsub",
         type=int,
         help="""The number of subjects being analyzed. If none
-                                        listed, default will be whole dataset""",
+                                        listed, default will be whole dataset (minus completed subjects)""",
     )
     subs_group.add_argument(
         "-s",
@@ -50,7 +50,7 @@ def init_argparse() -> argparse.ArgumentParser:
         nargs="*",
         help="""The subjects being analyzed. Do not include
                              sub- prefix. If subjects are not included,
-                             pre-processing will be run on whole dataset by default
+                             pre-processing will be run on whole dataset (minus completed subjects) by default
                              or on number of subjects given via the --numsub flag""",
     )
 
@@ -70,13 +70,6 @@ def init_argparse() -> argparse.ArgumentParser:
     general = argparse.ArgumentParser(add_help=False)
     gen = general.add_argument_group("General Optional Arguments")
     gen.add_argument(
-        "--no_qsub",
-        default=True,
-        action="store_false",
-        dest="is_qsub",
-        help="Does not submit generated bash scripts.",
-    )
-    gen.add_argument(
         "--rerun_mem",
         action="store_true",
         default=False,
@@ -86,14 +79,21 @@ def init_argparse() -> argparse.ArgumentParser:
         "--slots",
         type=int,
         help="""Set number of slots/threads per subject. Default
-                            is 16.""",
-        default=16,
+                            is 4.""",
+        default=4,
     )
 
     argon = argparse.ArgumentParser(add_help=False)
     argon_group = argon.add_argument_group("Argon HPC Optional Arguments")
     argon_group.add_argument(
         "--email", action="store_true", help="Receive email notifications from HPC"
+    )
+    argon_group.add_argument(
+        "--no_qsub",
+        default=True,
+        action="store_false",
+        dest="is_qsub",
+        help="Does not submit generated bash scripts.",
     )
 
     argon_group.add_argument(
@@ -126,7 +126,7 @@ def init_argparse() -> argparse.ArgumentParser:
 
     heudiconv_parser = subparsers.add_parser(
         s.HEUDICONV,
-        parents=[subs, dirs, general],
+        parents=[subs, dirs],
         usage="[SCRIPT_PATH][OPTIONS]",
         help="""Convert raw data files to
                                                  BIDS format. Conversion script
@@ -180,32 +180,43 @@ def init_argparse() -> argparse.ArgumentParser:
     deconvolve_parser = subparsers.add_parser(
         s.DECONVOLVE,
         parents=[subs, dirs, general, argon],
-        usage="[stimulus_header][timing_header][OPTIONS]",
-        help="""Parse regressor files to
-                                              extract columns and censor motion.""",
+        usage="[stimulus_col][timing_col][OPTIONS]",
+        help="""Parse regressor files, censor motion, create stimfiles, and run 3dDeconvolve.""",
     )
     deconvolve_parser.add_argument(
-        "stimulus_header",
-        help="""Header of column for stimulus type in
+        "stimulus_col",
+        help="""Column name for stimulus type in
                                     run timing file.""",
     )
     deconvolve_parser.add_argument(
-        "timing_header",
-        help="""Header of column for time of stimulus
+        "timing_col",
+        help="""Column name for time of stimulus
                                    presentation in run timing file.""",
+    )
+    deconvolve_parser.add_argument(
+        "--bold_wc",
+        default="*bold.nii.gz",
+        help="""Wildcard used to find bold files using glob. Must have * at beggining.
+                                   Default is *""",
     )
     deconvolve_parser.add_argument(
         "--timing_file_dir",
         help="""Directory holding run timing files.
                                    Default is dataset BIDS directory.""",
-    )  # todo default needs work
+    )
     deconvolve_parser.add_argument(
-        "--file_wc",
+        "--run_timing_wc",
         default="*",
         help="""Wildcard used to find run timing
                                    files using glob. Must have * at beggining.
                                    Default is *""",
     )
+    deconvolve_parser.add_argument(
+        "--regressors_wc",
+        default=wildcards.REGRESSOR_WC,
+        help=f"""Wildcard used to find regressors
+                                   files using glob. Must have * at beggining.
+                                   Default is {wildcards.REGRESSOR_WC}.""")
     deconvolve_parser.add_argument(
         "--use_stimfiles",
         default=False,
@@ -247,13 +258,54 @@ def init_argparse() -> argparse.ArgumentParser:
         help="""Threshold for censoring. Default is 0.2""",
     )
 
+    regressors_parser = subparsers.add_parser(
+        s.REGRESSORS,
+        parents=[subs, dirs],
+        usage="[OPTIONS]",
+        help="""Parse regressor files to extract columns and censor motion.""",
+    )
+    regressors_parser.add_argument(
+        "--regressors_wc",
+        default=wildcards.REGRESSOR_WC,
+        help=f"""Wildcard used to find regressors
+                                   files using glob. Must have * at beggining.
+                                   Default is {wildcards.REGRESSOR_WC}.""",
+    )
+    regressors_parser.add_argument(
+        "-c",
+        "--columns",
+        default=[],
+        nargs="*",
+        dest="columns",
+        help="""Enter columns to parse from
+                                          regressors file into nuisance.1D file for
+                                          usage in 3dDeconvolve. Default columns
+                                          will be added automatically.""",
+    )
+    regressors_parser.add_argument(
+        "--no_default",
+        default=False,
+        action="store_true",
+        help=f"""Enter flag to not use default
+                                          columns. If not entered, default columns
+                                          will be parsed. Default columns are:
+                                          {s.DEFAULT_COLUMNS}""",
+    )
+    regressors_parser.add_argument(
+        "--threshold",
+        default=0.2,
+        type=float,
+        help="""Threshold for censoring. Default is 0.2""",
+    )
+
     mema_parser = subparsers.add_parser(
         "3dmema",
         parents=[subs, dirs, general, argon],
         usage="[STARTING_INDEX][ENDING_INDEX][OPTIONS]",
-        help="""""",
+        help="""Runs 3dmema.""",
     )
-    mema_parser.add_argument("starting_index", default=2, type=int, help="""""")
+    mema_parser.add_argument(
+        "starting_index", default=2, type=int, help="""""")
     mema_parser.add_argument("ending_index", type=int, help="""""")
 
     fd_stats_parser = subparsers.add_parser(
@@ -297,7 +349,7 @@ def get_subjects(process, args, dir_tree, completed_subs, numsub=None):
         Command line arguments parsed by ArgumentParser
     dir_tree: DirectoryTree
         Class that contains general path info for dataset
-    completed_subs: [Subject]
+    completed_subs: [str]
         List of completed subjects found in completed_subjects.txt
     numsub: int
         Number of subjects to get
@@ -311,7 +363,7 @@ def get_subjects(process, args, dir_tree, completed_subs, numsub=None):
     # set directory from which to get subjects
     if process == s.FMRIPREP or process == s.MRIQC:
         sub_dir = dir_tree.bids_dir
-    elif process == s.DECONVOLVE or process == s.FD_STATS:
+    elif process in [s.DECONVOLVE, s.FD_STATS, s.REGRESSORS]:
         sub_dir = dir_tree.fmriprep_dir
 
     subjects = base.Subjects()
@@ -327,11 +379,12 @@ def get_subjects(process, args, dir_tree, completed_subs, numsub=None):
             args.mem = "mem_256G=true"
 
     elif process == s.HEUDICONV:
-        subjects = get_raw_subjects(dir_tree, completed_subs=completed_subs, num=numsub)
+        subjects = get_raw_subjects(
+            dir_tree, excluded=completed_subs, num=numsub)
         #
     elif args.subjects is None:
         subjects = base.get_subjects(
-            sub_dir, dir_tree, completed_subs=completed_subs, num=numsub
+            sub_dir, dir_tree, excluded=completed_subs, num=numsub
         )
     # subjects entered in command line
     else:
@@ -346,7 +399,8 @@ def get_subjects(process, args, dir_tree, completed_subs, numsub=None):
 def get_raw_subjects(dir_tree, num=None, completed_subs=base.Subjects()):
     dirs = os.listdir(dir_tree.raw_dir)
     zipped_dirs = sorted([dir for dir in dirs if ".zip" in dir])
-    unzipped_dirs = sorted([dir for dir in dirs if len(dir) > 8 and "zip" not in dir])
+    unzipped_dirs = sorted(
+        [dir for dir in dirs if len(dir) > 8 and "zip" not in dir])
     symbolic_links = sorted([dir for dir in dirs if len(dir) == 5])
 
     print(completed_subs)
@@ -376,7 +430,8 @@ def get_raw_subjects(dir_tree, num=None, completed_subs=base.Subjects()):
         print(f"Uzipping {zip}")
         with zipfile.ZipFile(dir_tree.raw_dir + zip, mode="r") as zip_ref:
             zip_ref.extractall(path=dir_tree.raw_dir)
-        unzipped_dir = max(glob.iglob(f"{dir_tree.raw_dir}*"), key=os.path.getctime)
+        unzipped_dir = max(glob.iglob(
+            f"{dir_tree.raw_dir}*"), key=os.path.getctime)
         final_unzipped_dir = (
             f'{dir_tree.raw_dir}{zip.replace(".zip", "___")}{str(subject)}'
         )
@@ -384,7 +439,8 @@ def get_raw_subjects(dir_tree, num=None, completed_subs=base.Subjects()):
         print(f"Unzipped {zip} to {final_unzipped_dir}")
 
         symbolic_link_dir = dir_tree.raw_dir + str(subject)
-        print(f"Created symbolic link {symbolic_link_dir} for {final_unzipped_dir}")
+        print(
+            f"Created symbolic link {symbolic_link_dir} for {final_unzipped_dir}")
         os.symlink(final_unzipped_dir, symbolic_link_dir)
         subjects.append(str(subject))
         subject += 1
@@ -399,7 +455,8 @@ def run_stack(process, args, dir_tree, completed_subs):
     stack_array = np.zeros(shape=(num_stacks))
 
     if args.stack[1] == "split":
-        total_subjects = len(get_subjects(process, args, dir_tree, completed_subs))
+        total_subjects = len(get_subjects(
+            process, args, dir_tree, completed_subs))
         subjects_per_stack = math.floor(total_subjects / num_stacks)
         stack_array = np.full(num_stacks, subjects_per_stack)
         for i in range(total_subjects % num_stacks):
@@ -408,7 +465,8 @@ def run_stack(process, args, dir_tree, completed_subs):
         stack_array = np.full(num_stacks, int(args.stack[1]))
 
     for numsub in np.nditer(stack_array):
-        subjects = get_subjects(process, args, dir_tree, completed_subs, numsub=numsub)
+        subjects = get_subjects(process, args, dir_tree,
+                                completed_subs, numsub=numsub)
         completed_subs.extend(subjects)
         args.hold_jid = run_process(process, args, dir_tree, subjects)
 
@@ -425,6 +483,24 @@ def run_process(process, args, dir_tree, subjects):
     if process == s.FD_STATS:
         motion.print_FD_stats(dir_tree, subjects, threshold=args.threshold)
         exit()
+    elif process == s.REGRESSORS:
+        # add default columns, avoiding duplicates
+        if not args.no_default:
+            for def_column in s.DEFAULT_COLUMNS:
+                if def_column not in args.columns:
+                    args.columns.append(def_column)
+                else:
+                    print(
+                        f"You entered the column {def_column} that already "
+                        "exists in the default columns. This is unnecessary."
+                    )
+        print(f"Extracting columns {args.columns} from regressor files")
+
+        for subject in subjects:
+            regressors.parse_regressors(
+                subject, args.columns, args.threshold, args.regressors_wc
+            )
+        exit()
 
     base_bashfile = bashwriter.Bashfile(
         f"{dir_tree.dataset_name}_{process}",
@@ -434,7 +510,8 @@ def run_process(process, args, dir_tree, subjects):
         f"{dir_tree.dataset_dir}{process}/",
     )
 
-    qsub_filepath = prep_bashfile(process, args, dir_tree, subjects, base_bashfile)
+    qsub_filepath = prep_bashfile(
+        process, args, dir_tree, subjects, base_bashfile)
 
     return submit_bashfile(qsub_filepath, args, subjects)
 
@@ -484,23 +561,24 @@ def prep_bashfile(process, args, dir_tree, subjects, base_bashfile):
 
         for subject in subjects:
             print(f"Prepping 3dDeconvolve on subject {subject.name}")
-            if not os.path.isdir(subject.deconvolve_dir):
-                os.mkdir(subject.deconvolve_dir)
 
-            prep_3d.parse_regressors(
-                subject,
-                args.columns,
-                args.threshold,
-            )
-            stimfiles = prep_3d.create_stimfiles(
-                subject,
-                args.timing_file_dir,
-                args.stimulus_header,
-                args.timing_header,
-                args.file_wc,
+            regressors.parse_regressors(
+                subject, args.columns, args.threshold, args.regressors_wc
             )
 
-        qsub_3d.write_qsub(base_bashfile, dir_tree, stimfiles, args.use_stimfiles)
+            run_files = base.get_ses_files(
+                subject, args.timing_file_dir, args.run_timing_wc)
+            stimfile_creator = stimfiles.StimfileCreator(
+                run_files,
+                subject,
+                args.stimulus_col,
+                args.timing_col,
+            )
+            stimfile_creator.create_stimfiles()
+
+        qsub_3d.write_qsub(
+            base_bashfile, dir_tree, stimfile_creator.stimfiles, args.use_stimfiles, args.bold_wc
+        )
         exit()
 
     # 3dMEMA
@@ -517,6 +595,7 @@ def prep_bashfile(process, args, dir_tree, subjects, base_bashfile):
 
 
 def submit_bashfile(qsub_filepath, args, subjects):
+    print('hello')
     if args.is_qsub and not args.is_thalamege:
         if len(subjects) == 1:
             completed_proc = subprocess.run(
@@ -580,7 +659,8 @@ def setup_mema(dir_tree, args, subjects, base_bashfile):
     bashfile = bashfile.replace(s.DATASET_KEY, dir_tree.dataset_dir)
     bashfile = bashfile.replace(s.SLOTS_KEY, str(base_bashfile.slots))
     bashfile = bashfile.replace(s.SGE_KEY, "\n".join(base_bashfile.sge_lines))
-    bashfile = bashfile.replace(s.BASE_SCRIPT_KEY, "\n".join(base_bashfile.script))
+    bashfile = bashfile.replace(
+        s.BASE_SCRIPT_KEY, "\n".join(base_bashfile.script))
     bashfile = bashfile.replace(s.COEF_KEY, " ".join(coefficients))
     bashfile = bashfile.replace(s.TSTAT_KEY, " ".join(tstats))
     bashfile = bashfile.replace(s.COND_KEY, " ".join(conditions))
@@ -646,7 +726,8 @@ def main():
                     f"{s.LOCALSCRATCH}{getpass.getuser()}/" "${JOB_ID}_${SGE_TASK_ID}/"
                 )
         else:
-            raise Exception("Unrecognized server host. Must be Thalamege or Argon.")
+            raise Exception(
+                "Unrecognized server host. Must be Thalamege or Argon.")
 
         # Create directory tree, contains basely used dataset paths
         dir_tree = base.DirectoryTree(
@@ -664,6 +745,8 @@ def main():
             dir_tree.process_dir = dir_tree.raw_dir
         elif process == s.FD_STATS:
             dir_tree.process_dir = dir_tree.analysis_dir
+        elif process == s.REGRESSORS:
+            dir_tree.process_dir = dir_tree.fmriprep_dir
         else:
             dir_tree.process_dir = f"{dir_tree.dataset_dir}{process}/"
 
@@ -684,7 +767,8 @@ def main():
             run_stack(process, args, dir_tree, completed_subs)
             exit()
 
-        subjects = get_subjects(process, args, dir_tree, completed_subs, args.numsub)
+        subjects = get_subjects(process, args, dir_tree,
+                                completed_subs, args.numsub)
         run_process(process, args, dir_tree, subjects)
 
 

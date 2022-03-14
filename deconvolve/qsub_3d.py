@@ -3,7 +3,7 @@ import settings as s
 from lib import bashwriter
 import os
 from thalpy import base
-from thalpy.constants import wildcards
+from thalpy.constants import wildcards, paths
 
 
 def convert_stim_config(df, stim_times, gltsym, iresp):
@@ -17,7 +17,8 @@ def convert_stim_config(df, stim_times, gltsym, iresp):
         gltsym.append(
             f'-gltsym "SYM: +1*{row["Stim Label"]}" -glt_label {index + 1} {row["Stim Label"]} \\'
         )
-        iresp.append(f'-iresp {index + 1} {row["Stim Label"]}_FIR_MIN.nii.gz \\')
+        iresp.append(
+            f'-iresp {index + 1} {row["Stim Label"]}_FIR_MIN.nii.gz \\')
 
         group_gltsym = "-gltsym SYM:"
         grouped_stimuli = df.groupby("Group")
@@ -57,15 +58,16 @@ def load_stimtimes(deconvolve_dir, stimfiles, use_stimfiles):
     return stim_times + iresp + gltsym
 
 
-def write_qsub(base_bashfile, dir_tree, stimfiles, use_stimfiles):
+def write_qsub(base_bashfile, dir_tree, stimfiles, use_stimfiles, bold_wc):
     bashfile = list()
-    stimlines = load_stimtimes(dir_tree.deconvolve_dir, stimfiles, use_stimfiles)
+    stimlines = load_stimtimes(
+        dir_tree.deconvolve_dir, stimfiles, use_stimfiles)
 
     bashfile.extend(base_bashfile.sge_lines)
     bashfile.extend(base_bashfile.script)
 
     bashfile.append(f'echo "Starting {s.DECONVOLVE} on $subject"')
-    bashfile.append(f'cd {dir_tree.deconvolve_dir}{"$subject/"} \n')
+    bashfile.append(f"cd {dir_tree.deconvolve_dir}sub-$subject/ \n")
     # create mask
     bashfile.append(f"{s.SING_RUNCLEAN} {s.AFNI_SING_PATH} \\")
     # mask_files = [
@@ -79,8 +81,8 @@ def write_qsub(base_bashfile, dir_tree, stimfiles, use_stimfiles):
         bashfile.append(
             (
                 f"3dmask_tool -input $(find {dir_tree.fmriprep_dir} -regex "
-                f'"{dir_tree.fmriprep_dir}sub-${"{subject}"}/\({"|".join(dir_tree.sessions)}\).*mask\.nii\.gz") \n'.replace(
-                    "|", "\|"
+                f'"{dir_tree.fmriprep_dir}sub-$subject/\({"%".join(dir_tree.sessions)}\).*mask\.nii\.gz") \n'.replace(
+                    "%", "\|"
                 )
             )
         )
@@ -88,8 +90,8 @@ def write_qsub(base_bashfile, dir_tree, stimfiles, use_stimfiles):
         bashfile.append(
             (
                 f"3dmask_tool -input $(find {dir_tree.fmriprep_dir} -regex "
-                f'"{dir_tree.fmriprep_dir}sub-${"{subject}"}.*mask\.nii\.gz") \n'.replace(
-                    "|", "\|"
+                f'"{dir_tree.fmriprep_dir}sub-$subject.*mask\.nii\.gz") \n'.replace(
+                    "%", "\|"
                 )
             )
         )
@@ -99,22 +101,22 @@ def write_qsub(base_bashfile, dir_tree, stimfiles, use_stimfiles):
     if dir_tree.sessions:
         bashfile.append(
             f"{s.DECONVOLVE} -input $(find {dir_tree.fmriprep_dir} -regex "
-            f'"{dir_tree.fmriprep_dir}{"$subject/"}\({"|".join(dir_tree.sessions)}\).*desc-preproc_bold\.nii\.gz" -print0 | sort -z | xargs -r0) \\'.replace(
-                "|", "\|"
+            f'"{dir_tree.fmriprep_dir}sub-$subject/\({"%".join(dir_tree.sessions)}\).*{bold_wc}" -print0 | sort -z | xargs -r0) \\'.replace(
+                "%", "\|"
             )
         )
     else:
         bashfile.append(
             f"{s.DECONVOLVE} -input $(find {dir_tree.fmriprep_dir} -regex "
-            f'"{dir_tree.fmriprep_dir}{"$subject/"}.*desc-preproc_bold\.nii\.gz" -print0 | sort -z | xargs -r0) \\'.replace(
-                "|", "\|"
+            f'"{dir_tree.fmriprep_dir}sub-$subject/.*{bold_wc}" -print0 | sort -z | xargs -r0) \\'.replace(
+                "%", "\|"
             )
         )
 
     bashfile.append(f"-mask {s.MASK_FILE} \\")
     bashfile.append("-polort A \\")
-    bashfile.append(f"-censor {s.CENSOR_FILE} \\")
-    bashfile.append(f"-ortvec {s.REGRESSOR_FILE} nuisance \\")
+    bashfile.append(f"-censor {paths.CENSOR_FILE} \\")
+    bashfile.append(f"-ortvec {paths.REGRESSOR_FILE} nuisance \\")
     bashfile.append("-local_times \\")
     bashfile.extend(stimlines)
 
@@ -127,7 +129,6 @@ def write_qsub(base_bashfile, dir_tree, stimfiles, use_stimfiles):
     bashfile.append(f"-jobs {base_bashfile.slots} \\")
     bashfile.append("-ok_1D_text")
     bashfile = "\n".join(bashfile)
-    print(base_bashfile.output_dir)
     return bashwriter.write_file(
         bashfile, base_bashfile.output_dir, base_bashfile.job_name
     )

@@ -1,0 +1,346 @@
+#$ -N Tomoya_3dDeconvolve
+#$ -q SEASHORE
+#$ -pe smp 16
+#$ -t 1-6
+#$ -ckpt user
+export OMP_NUM_THREADS=16
+/bin/echo Running on compute node: `hostname`.
+/bin/echo Job: $JOB_ID
+/bin/echo Task: $SGE_TASK_ID
+/bin/echo In directory: `pwd`
+/bin/echo Starting on: `date`
+
+
+subjects=(01 02 03 04 05 06)
+echo subjects: ${subjects[@]}
+echo total_subjects=${#subjects[@]}
+subject="${subjects[$SGE_TASK_ID-1]}"
+echo "Starting 3dDeconvolve on $subject"
+cd /Shared/lss_kahwang_hpc/data/Tomoya/3dDeconvolve/sub-$subject/ 
+
+singularity run --cleanenv /Shared/lss_kahwang_hpc/opt/afni/afni.sif \
+3dmask_tool -input $(find /Shared/lss_kahwang_hpc/data/Tomoya/fmriprep/ -regex "/Shared/lss_kahwang_hpc/data/Tomoya/fmriprep/sub-$subject.*test.*mask\.nii\.gz") 
+
+singularity run --cleanenv /Shared/lss_kahwang_hpc/opt/afni/afni.sif \
+3dDeconvolve -input $(find /Shared/lss_kahwang_hpc/data/Tomoya/fmriprep/ -regex "/Shared/lss_kahwang_hpc/data/Tomoya/fmriprep/sub-$subject/.*test.*desc-preproc_bold\.nii\.gz" -print0 | sort -z | xargs -r0) \
+-mask combined_mask+tlrc.BRIK \
+-polort A \
+-censor censor.1D \
+-ortvec nuisance.1D nuisance \
+-local_times \
+-num_stimts 102 \
+-stim_times 1 Sarcasm.1D.txt 'BLOCK(8)' -stim_label 1 Sarcasm \
+-stim_times 2 StateMap.1D.txt 'BLOCK(6)' -stim_label 2 StateMap \
+-stim_times 3 ForeignListen.1D.txt 'BLOCK(10)' -stim_label 3 ForeignListen \
+-stim_times 4 ForeignListenQ.1D.txt 'BLOCK(6)' -stim_label 4 ForeignListenQ \
+-stim_times 5 EyeMoveHard.1D.txt 'BLOCK(8)' -stim_label 5 EyeMoveHard \
+-stim_times 6 MusicCategory.1D.txt 'BLOCK(10)' -stim_label 6 MusicCategory \
+-stim_times 7 FeedbackPos.1D.txt 'BLOCK(6)' -stim_label 7 FeedbackPos \
+-stim_times 8 PressLeft.1D.txt 'BLOCK(8)' -stim_label 8 PressLeft \
+-stim_times 9 MoralPersonal.1D.txt 'BLOCK(12)' -stim_label 9 MoralPersonal \
+-stim_times 10 AnimalVoice.1D.txt 'BLOCK(6)' -stim_label 10 AnimalVoice \
+-stim_times 11 Flag.1D.txt 'BLOCK(6)' -stim_label 11 Flag \
+-stim_times 12 CountDot.1D.txt 'BLOCK(6)' -stim_label 12 CountDot \
+-stim_times 13 PropLogic.1D.txt 'BLOCK(12)' -stim_label 13 PropLogic \
+-stim_times 14 RateBeautySound.1D.txt 'BLOCK(10)' -stim_label 14 RateBeautySound \
+-stim_times 15 DecidePresent.1D.txt 'BLOCK(8)' -stim_label 15 DecidePresent \
+-stim_times 16 TimeMov.1D.txt 'BLOCK(8)' -stim_label 16 TimeMov \
+-stim_times 17 DecidePeople.1D.txt 'BLOCK(8)' -stim_label 17 DecidePeople \
+-stim_times 18 RateDisgustMov.1D.txt 'BLOCK(10)' -stim_label 18 RateDisgustMov \
+-stim_times 19 Clock.1D.txt 'BLOCK(6)' -stim_label 19 Clock \
+-stim_times 20 AnimalPhoto.1D.txt 'BLOCK(6)' -stim_label 20 AnimalPhoto \
+-stim_times 21 RateHappyPic.1D.txt 'BLOCK(6)' -stim_label 21 RateHappyPic \
+-stim_times 22 DailySound.1D.txt 'BLOCK(6)' -stim_label 22 DailySound \
+-stim_times 23 EyeBlink.1D.txt 'BLOCK(8)' -stim_label 23 EyeBlink \
+-stim_times 24 ImagineMove.1D.txt 'BLOCK(8)' -stim_label 24 ImagineMove \
+-stim_times 25 SoundLeft.1D.txt 'BLOCK(8)' -stim_label 25 SoundLeft \
+-stim_times 26 WorldPlace.1D.txt 'BLOCK(6)' -stim_label 26 WorldPlace \
+-stim_times 27 Recipe.1D.txt 'BLOCK(8)' -stim_label 27 Recipe \
+-stim_times 28 RelationLogic.1D.txt 'BLOCK(12)' -stim_label 28 RelationLogic \
+-stim_times 29 DomesiticPlace.1D.txt 'BLOCK(6)' -stim_label 29 DomesiticPlace \
+-stim_times 30 ComparePeople.1D.txt 'BLOCK(6)' -stim_label 30 ComparePeople \
+-stim_times 31 DailyPhoto.1D.txt 'BLOCK(6)' -stim_label 31 DailyPhoto \
+-stim_times 32 SoundRight.1D.txt 'BLOCK(8)' -stim_label 32 SoundRight \
+-stim_times 33 PressRight.1D.txt 'BLOCK(8)' -stim_label 33 PressRight \
+-stim_times 34 RateSexyPicF.1D.txt 'BLOCK(6)' -stim_label 34 RateSexyPicF \
+-stim_times 35 RateDisgustSound.1D.txt 'BLOCK(6)' -stim_label 35 RateDisgustSound \
+-stim_times 36 MemoryLetter.1D.txt 'BLOCK(6)' -stim_label 36 MemoryLetter \
+-stim_times 37 RateSexyPicM.1D.txt 'BLOCK(6)' -stim_label 37 RateSexyPicM \
+-stim_times 38 MatchLetter.1D.txt 'BLOCK(6)' -stim_label 38 MatchLetter \
+-stim_times 39 TimeSound.1D.txt 'BLOCK(8)' -stim_label 39 TimeSound \
+-stim_times 40 LetterFluency.1D.txt 'BLOCK(10)' -stim_label 40 LetterFluency \
+-stim_times 41 RateDeliciousPic.1D.txt 'BLOCK(6)' -stim_label 41 RateDeliciousPic \
+-stim_times 42 RecallKnowledge.1D.txt 'BLOCK(10)' -stim_label 42 RecallKnowledge \
+-stim_times 43 DetectTargetPic.1D.txt 'BLOCK(8)' -stim_label 43 DetectTargetPic \
+-stim_times 44 MapIcon.1D.txt 'BLOCK(6)' -stim_label 44 MapIcon \
+-stim_times 45 ImaginePlace.1D.txt 'BLOCK(8)' -stim_label 45 ImaginePlace \
+-stim_times 46 MoralImpersonal.1D.txt 'BLOCK(12)' -stim_label 46 MoralImpersonal \
+-stim_times 47 CountryMap.1D.txt 'BLOCK(6)' -stim_label 47 CountryMap \
+-stim_times 48 ImagineIf.1D.txt 'BLOCK(8)' -stim_label 48 ImagineIf \
+-stim_times 49 DecideShopping.1D.txt 'BLOCK(8)' -stim_label 49 DecideShopping \
+-stim_times 50 PressOrdHard.1D.txt 'BLOCK(8)' -stim_label 50 PressOrdHard \
+-stim_times 51 RateBeautyPic.1D.txt 'BLOCK(6)' -stim_label 51 RateBeautyPic \
+-stim_times 52 PressLR.1D.txt 'BLOCK(8)' -stim_label 52 PressLR \
+-stim_times 53 LanguageSound.1D.txt 'BLOCK(6)' -stim_label 53 LanguageSound \
+-stim_times 54 RateBeautyMov.1D.txt 'BLOCK(10)' -stim_label 54 RateBeautyMov \
+-stim_times 55 ImagineFuture.1D.txt 'BLOCK(8)' -stim_label 55 ImagineFuture \
+-stim_times 56 RatePainfulPic.1D.txt 'BLOCK(6)' -stim_label 56 RatePainfulPic \
+-stim_times 57 DetectTargetMov.1D.txt 'BLOCK(6)' -stim_label 57 DetectTargetMov \
+-stim_times 58 WordMeaning.1D.txt 'BLOCK(6)' -stim_label 58 WordMeaning \
+-stim_times 59 EyeMoveEasy.1D.txt 'BLOCK(8)' -stim_label 59 EyeMoveEasy \
+-stim_times 60 RatePoem.1D.txt 'BLOCK(12)' -stim_label 60 RatePoem \
+-stim_times 61 RecallFace.1D.txt 'BLOCK(8)' -stim_label 61 RecallFace \
+-stim_times 62 RecallTaskHard.1D.txt 'BLOCK(6)' -stim_label 62 RecallTaskHard \
+-stim_times 63 CountTone.1D.txt 'BLOCK(6)' -stim_label 63 CountTone \
+-stim_times 64 SoundPlace.1D.txt 'BLOCK(6)' -stim_label 64 SoundPlace \
+-stim_times 65 DetectColor.1D.txt 'BLOCK(6)' -stim_label 65 DetectColor \
+-stim_times 66 Money.1D.txt 'BLOCK(8)' -stim_label 66 Money \
+-stim_times 67 Rhythm.1D.txt 'BLOCK(6)' -stim_label 67 Rhythm \
+-stim_times 68 PressOrdEasy.1D.txt 'BLOCK(8)' -stim_label 68 PressOrdEasy \
+-stim_times 69 RateDisgustPic.1D.txt 'BLOCK(6)' -stim_label 69 RateDisgustPic \
+-stim_times 70 Metaphor.1D.txt 'BLOCK(8)' -stim_label 70 Metaphor \
+-stim_times 71 MirrorImage.1D.txt 'BLOCK(6)' -stim_label 71 MirrorImage \
+-stim_times 72 EmotionVoice.1D.txt 'BLOCK(6)' -stim_label 72 EmotionVoice \
+-stim_times 73 RateConfidence.1D.txt 'BLOCK(6)' -stim_label 73 RateConfidence \
+-stim_times 74 CategoryFluency.1D.txt 'BLOCK(10)' -stim_label 74 CategoryFluency \
+-stim_times 75 RateSleepy.1D.txt 'BLOCK(6)' -stim_label 75 RateSleepy \
+-stim_times 76 RateSexyMovF.1D.txt 'BLOCK(6)' -stim_label 76 RateSexyMovF \
+-stim_times 77 EmotionFace.1D.txt 'BLOCK(6)' -stim_label 77 EmotionFace \
+-stim_times 78 RatePainfulMov.1D.txt 'BLOCK(10)' -stim_label 78 RatePainfulMov \
+-stim_times 79 RateDeliciousMov.1D.txt 'BLOCK(10)' -stim_label 79 RateDeliciousMov \
+-stim_times 80 RateSexyMovM.1D.txt 'BLOCK(6)' -stim_label 80 RateSexyMovM \
+-stim_times 81 ForeignRead.1D.txt 'BLOCK(12)' -stim_label 81 ForeignRead \
+-stim_times 82 ForeignReadQ.1D.txt 'BLOCK(6)' -stim_label 82 ForeignReadQ \
+-stim_times 83 CalcHard.1D.txt 'BLOCK(10)' -stim_label 83 CalcHard \
+-stim_times 84 CalcEasy.1D.txt 'BLOCK(8)' -stim_label 84 CalcEasy \
+-stim_times 85 TrafficSign.1D.txt 'BLOCK(6)' -stim_label 85 TrafficSign \
+-stim_times 86 RateTired.1D.txt 'BLOCK(6)' -stim_label 86 RateTired \
+-stim_times 87 MemoryNameHard.1D.txt 'BLOCK(6)' -stim_label 87 MemoryNameHard \
+-stim_times 88 MatchNameHard.1D.txt 'BLOCK(8)' -stim_label 88 MatchNameHard \
+-stim_times 89 DomesiticName.1D.txt 'BLOCK(6)' -stim_label 89 DomesiticName \
+-stim_times 90 MemoryNameEasy.1D.txt 'BLOCK(6)' -stim_label 90 MemoryNameEasy \
+-stim_times 91 MatchNameEasy.1D.txt 'BLOCK(8)' -stim_label 91 MatchNameEasy \
+-stim_times 92 WorldName.1D.txt 'BLOCK(6)' -stim_label 92 WorldName \
+-stim_times 93 DetectDifference.1D.txt 'BLOCK(8)' -stim_label 93 DetectDifference \
+-stim_times 94 RateNoisy.1D.txt 'BLOCK(8)' -stim_label 94 RateNoisy \
+-stim_times 95 DecideFood.1D.txt 'BLOCK(8)' -stim_label 95 DecideFood \
+-stim_times 96 RecallTaskEasy.1D.txt 'BLOCK(6)' -stim_label 96 RecallTaskEasy \
+-stim_times 97 MemoryDigit.1D.txt 'BLOCK(6)' -stim_label 97 MemoryDigit \
+-stim_times 98 RecallPast.1D.txt 'BLOCK(8)' -stim_label 98 RecallPast \
+-stim_times 99 MatchDigit.1D.txt 'BLOCK(6)' -stim_label 99 MatchDigit \
+-stim_times 100 TimeValue.1D.txt 'BLOCK(8)' -stim_label 100 TimeValue \
+-stim_times 101 RateHappyMov.1D.txt 'BLOCK(10)' -stim_label 101 RateHappyMov \
+-stim_times 102 Harmony.1D.txt 'BLOCK(6)' -stim_label 102 Harmony \
+-iresp 1 Sarcasm_FIR_MIN.nii.gz \
+-iresp 2 StateMap_FIR_MIN.nii.gz \
+-iresp 3 ForeignListen_FIR_MIN.nii.gz \
+-iresp 4 ForeignListenQ_FIR_MIN.nii.gz \
+-iresp 5 EyeMoveHard_FIR_MIN.nii.gz \
+-iresp 6 MusicCategory_FIR_MIN.nii.gz \
+-iresp 7 FeedbackPos_FIR_MIN.nii.gz \
+-iresp 8 PressLeft_FIR_MIN.nii.gz \
+-iresp 9 MoralPersonal_FIR_MIN.nii.gz \
+-iresp 10 AnimalVoice_FIR_MIN.nii.gz \
+-iresp 11 Flag_FIR_MIN.nii.gz \
+-iresp 12 CountDot_FIR_MIN.nii.gz \
+-iresp 13 PropLogic_FIR_MIN.nii.gz \
+-iresp 14 RateBeautySound_FIR_MIN.nii.gz \
+-iresp 15 DecidePresent_FIR_MIN.nii.gz \
+-iresp 16 TimeMov_FIR_MIN.nii.gz \
+-iresp 17 DecidePeople_FIR_MIN.nii.gz \
+-iresp 18 RateDisgustMov_FIR_MIN.nii.gz \
+-iresp 19 Clock_FIR_MIN.nii.gz \
+-iresp 20 AnimalPhoto_FIR_MIN.nii.gz \
+-iresp 21 RateHappyPic_FIR_MIN.nii.gz \
+-iresp 22 DailySound_FIR_MIN.nii.gz \
+-iresp 23 EyeBlink_FIR_MIN.nii.gz \
+-iresp 24 ImagineMove_FIR_MIN.nii.gz \
+-iresp 25 SoundLeft_FIR_MIN.nii.gz \
+-iresp 26 WorldPlace_FIR_MIN.nii.gz \
+-iresp 27 Recipe_FIR_MIN.nii.gz \
+-iresp 28 RelationLogic_FIR_MIN.nii.gz \
+-iresp 29 DomesiticPlace_FIR_MIN.nii.gz \
+-iresp 30 ComparePeople_FIR_MIN.nii.gz \
+-iresp 31 DailyPhoto_FIR_MIN.nii.gz \
+-iresp 32 SoundRight_FIR_MIN.nii.gz \
+-iresp 33 PressRight_FIR_MIN.nii.gz \
+-iresp 34 RateSexyPicF_FIR_MIN.nii.gz \
+-iresp 35 RateDisgustSound_FIR_MIN.nii.gz \
+-iresp 36 MemoryLetter_FIR_MIN.nii.gz \
+-iresp 37 RateSexyPicM_FIR_MIN.nii.gz \
+-iresp 38 MatchLetter_FIR_MIN.nii.gz \
+-iresp 39 TimeSound_FIR_MIN.nii.gz \
+-iresp 40 LetterFluency_FIR_MIN.nii.gz \
+-iresp 41 RateDeliciousPic_FIR_MIN.nii.gz \
+-iresp 42 RecallKnowledge_FIR_MIN.nii.gz \
+-iresp 43 DetectTargetPic_FIR_MIN.nii.gz \
+-iresp 44 MapIcon_FIR_MIN.nii.gz \
+-iresp 45 ImaginePlace_FIR_MIN.nii.gz \
+-iresp 46 MoralImpersonal_FIR_MIN.nii.gz \
+-iresp 47 CountryMap_FIR_MIN.nii.gz \
+-iresp 48 ImagineIf_FIR_MIN.nii.gz \
+-iresp 49 DecideShopping_FIR_MIN.nii.gz \
+-iresp 50 PressOrdHard_FIR_MIN.nii.gz \
+-iresp 51 RateBeautyPic_FIR_MIN.nii.gz \
+-iresp 52 PressLR_FIR_MIN.nii.gz \
+-iresp 53 LanguageSound_FIR_MIN.nii.gz \
+-iresp 54 RateBeautyMov_FIR_MIN.nii.gz \
+-iresp 55 ImagineFuture_FIR_MIN.nii.gz \
+-iresp 56 RatePainfulPic_FIR_MIN.nii.gz \
+-iresp 57 DetectTargetMov_FIR_MIN.nii.gz \
+-iresp 58 WordMeaning_FIR_MIN.nii.gz \
+-iresp 59 EyeMoveEasy_FIR_MIN.nii.gz \
+-iresp 60 RatePoem_FIR_MIN.nii.gz \
+-iresp 61 RecallFace_FIR_MIN.nii.gz \
+-iresp 62 RecallTaskHard_FIR_MIN.nii.gz \
+-iresp 63 CountTone_FIR_MIN.nii.gz \
+-iresp 64 SoundPlace_FIR_MIN.nii.gz \
+-iresp 65 DetectColor_FIR_MIN.nii.gz \
+-iresp 66 Money_FIR_MIN.nii.gz \
+-iresp 67 Rhythm_FIR_MIN.nii.gz \
+-iresp 68 PressOrdEasy_FIR_MIN.nii.gz \
+-iresp 69 RateDisgustPic_FIR_MIN.nii.gz \
+-iresp 70 Metaphor_FIR_MIN.nii.gz \
+-iresp 71 MirrorImage_FIR_MIN.nii.gz \
+-iresp 72 EmotionVoice_FIR_MIN.nii.gz \
+-iresp 73 RateConfidence_FIR_MIN.nii.gz \
+-iresp 74 CategoryFluency_FIR_MIN.nii.gz \
+-iresp 75 RateSleepy_FIR_MIN.nii.gz \
+-iresp 76 RateSexyMovF_FIR_MIN.nii.gz \
+-iresp 77 EmotionFace_FIR_MIN.nii.gz \
+-iresp 78 RatePainfulMov_FIR_MIN.nii.gz \
+-iresp 79 RateDeliciousMov_FIR_MIN.nii.gz \
+-iresp 80 RateSexyMovM_FIR_MIN.nii.gz \
+-iresp 81 ForeignRead_FIR_MIN.nii.gz \
+-iresp 82 ForeignReadQ_FIR_MIN.nii.gz \
+-iresp 83 CalcHard_FIR_MIN.nii.gz \
+-iresp 84 CalcEasy_FIR_MIN.nii.gz \
+-iresp 85 TrafficSign_FIR_MIN.nii.gz \
+-iresp 86 RateTired_FIR_MIN.nii.gz \
+-iresp 87 MemoryNameHard_FIR_MIN.nii.gz \
+-iresp 88 MatchNameHard_FIR_MIN.nii.gz \
+-iresp 89 DomesiticName_FIR_MIN.nii.gz \
+-iresp 90 MemoryNameEasy_FIR_MIN.nii.gz \
+-iresp 91 MatchNameEasy_FIR_MIN.nii.gz \
+-iresp 92 WorldName_FIR_MIN.nii.gz \
+-iresp 93 DetectDifference_FIR_MIN.nii.gz \
+-iresp 94 RateNoisy_FIR_MIN.nii.gz \
+-iresp 95 DecideFood_FIR_MIN.nii.gz \
+-iresp 96 RecallTaskEasy_FIR_MIN.nii.gz \
+-iresp 97 MemoryDigit_FIR_MIN.nii.gz \
+-iresp 98 RecallPast_FIR_MIN.nii.gz \
+-iresp 99 MatchDigit_FIR_MIN.nii.gz \
+-iresp 100 TimeValue_FIR_MIN.nii.gz \
+-iresp 101 RateHappyMov_FIR_MIN.nii.gz \
+-iresp 102 Harmony_FIR_MIN.nii.gz \
+-num_glt 102 \
+-gltsym "SYM: +1*Sarcasm" -glt_label 1 Sarcasm \
+-gltsym "SYM: +1*StateMap" -glt_label 2 StateMap \
+-gltsym "SYM: +1*ForeignListen" -glt_label 3 ForeignListen \
+-gltsym "SYM: +1*ForeignListenQ" -glt_label 4 ForeignListenQ \
+-gltsym "SYM: +1*EyeMoveHard" -glt_label 5 EyeMoveHard \
+-gltsym "SYM: +1*MusicCategory" -glt_label 6 MusicCategory \
+-gltsym "SYM: +1*FeedbackPos" -glt_label 7 FeedbackPos \
+-gltsym "SYM: +1*PressLeft" -glt_label 8 PressLeft \
+-gltsym "SYM: +1*MoralPersonal" -glt_label 9 MoralPersonal \
+-gltsym "SYM: +1*AnimalVoice" -glt_label 10 AnimalVoice \
+-gltsym "SYM: +1*Flag" -glt_label 11 Flag \
+-gltsym "SYM: +1*CountDot" -glt_label 12 CountDot \
+-gltsym "SYM: +1*PropLogic" -glt_label 13 PropLogic \
+-gltsym "SYM: +1*RateBeautySound" -glt_label 14 RateBeautySound \
+-gltsym "SYM: +1*DecidePresent" -glt_label 15 DecidePresent \
+-gltsym "SYM: +1*TimeMov" -glt_label 16 TimeMov \
+-gltsym "SYM: +1*DecidePeople" -glt_label 17 DecidePeople \
+-gltsym "SYM: +1*RateDisgustMov" -glt_label 18 RateDisgustMov \
+-gltsym "SYM: +1*Clock" -glt_label 19 Clock \
+-gltsym "SYM: +1*AnimalPhoto" -glt_label 20 AnimalPhoto \
+-gltsym "SYM: +1*RateHappyPic" -glt_label 21 RateHappyPic \
+-gltsym "SYM: +1*DailySound" -glt_label 22 DailySound \
+-gltsym "SYM: +1*EyeBlink" -glt_label 23 EyeBlink \
+-gltsym "SYM: +1*ImagineMove" -glt_label 24 ImagineMove \
+-gltsym "SYM: +1*SoundLeft" -glt_label 25 SoundLeft \
+-gltsym "SYM: +1*WorldPlace" -glt_label 26 WorldPlace \
+-gltsym "SYM: +1*Recipe" -glt_label 27 Recipe \
+-gltsym "SYM: +1*RelationLogic" -glt_label 28 RelationLogic \
+-gltsym "SYM: +1*DomesiticPlace" -glt_label 29 DomesiticPlace \
+-gltsym "SYM: +1*ComparePeople" -glt_label 30 ComparePeople \
+-gltsym "SYM: +1*DailyPhoto" -glt_label 31 DailyPhoto \
+-gltsym "SYM: +1*SoundRight" -glt_label 32 SoundRight \
+-gltsym "SYM: +1*PressRight" -glt_label 33 PressRight \
+-gltsym "SYM: +1*RateSexyPicF" -glt_label 34 RateSexyPicF \
+-gltsym "SYM: +1*RateDisgustSound" -glt_label 35 RateDisgustSound \
+-gltsym "SYM: +1*MemoryLetter" -glt_label 36 MemoryLetter \
+-gltsym "SYM: +1*RateSexyPicM" -glt_label 37 RateSexyPicM \
+-gltsym "SYM: +1*MatchLetter" -glt_label 38 MatchLetter \
+-gltsym "SYM: +1*TimeSound" -glt_label 39 TimeSound \
+-gltsym "SYM: +1*LetterFluency" -glt_label 40 LetterFluency \
+-gltsym "SYM: +1*RateDeliciousPic" -glt_label 41 RateDeliciousPic \
+-gltsym "SYM: +1*RecallKnowledge" -glt_label 42 RecallKnowledge \
+-gltsym "SYM: +1*DetectTargetPic" -glt_label 43 DetectTargetPic \
+-gltsym "SYM: +1*MapIcon" -glt_label 44 MapIcon \
+-gltsym "SYM: +1*ImaginePlace" -glt_label 45 ImaginePlace \
+-gltsym "SYM: +1*MoralImpersonal" -glt_label 46 MoralImpersonal \
+-gltsym "SYM: +1*CountryMap" -glt_label 47 CountryMap \
+-gltsym "SYM: +1*ImagineIf" -glt_label 48 ImagineIf \
+-gltsym "SYM: +1*DecideShopping" -glt_label 49 DecideShopping \
+-gltsym "SYM: +1*PressOrdHard" -glt_label 50 PressOrdHard \
+-gltsym "SYM: +1*RateBeautyPic" -glt_label 51 RateBeautyPic \
+-gltsym "SYM: +1*PressLR" -glt_label 52 PressLR \
+-gltsym "SYM: +1*LanguageSound" -glt_label 53 LanguageSound \
+-gltsym "SYM: +1*RateBeautyMov" -glt_label 54 RateBeautyMov \
+-gltsym "SYM: +1*ImagineFuture" -glt_label 55 ImagineFuture \
+-gltsym "SYM: +1*RatePainfulPic" -glt_label 56 RatePainfulPic \
+-gltsym "SYM: +1*DetectTargetMov" -glt_label 57 DetectTargetMov \
+-gltsym "SYM: +1*WordMeaning" -glt_label 58 WordMeaning \
+-gltsym "SYM: +1*EyeMoveEasy" -glt_label 59 EyeMoveEasy \
+-gltsym "SYM: +1*RatePoem" -glt_label 60 RatePoem \
+-gltsym "SYM: +1*RecallFace" -glt_label 61 RecallFace \
+-gltsym "SYM: +1*RecallTaskHard" -glt_label 62 RecallTaskHard \
+-gltsym "SYM: +1*CountTone" -glt_label 63 CountTone \
+-gltsym "SYM: +1*SoundPlace" -glt_label 64 SoundPlace \
+-gltsym "SYM: +1*DetectColor" -glt_label 65 DetectColor \
+-gltsym "SYM: +1*Money" -glt_label 66 Money \
+-gltsym "SYM: +1*Rhythm" -glt_label 67 Rhythm \
+-gltsym "SYM: +1*PressOrdEasy" -glt_label 68 PressOrdEasy \
+-gltsym "SYM: +1*RateDisgustPic" -glt_label 69 RateDisgustPic \
+-gltsym "SYM: +1*Metaphor" -glt_label 70 Metaphor \
+-gltsym "SYM: +1*MirrorImage" -glt_label 71 MirrorImage \
+-gltsym "SYM: +1*EmotionVoice" -glt_label 72 EmotionVoice \
+-gltsym "SYM: +1*RateConfidence" -glt_label 73 RateConfidence \
+-gltsym "SYM: +1*CategoryFluency" -glt_label 74 CategoryFluency \
+-gltsym "SYM: +1*RateSleepy" -glt_label 75 RateSleepy \
+-gltsym "SYM: +1*RateSexyMovF" -glt_label 76 RateSexyMovF \
+-gltsym "SYM: +1*EmotionFace" -glt_label 77 EmotionFace \
+-gltsym "SYM: +1*RatePainfulMov" -glt_label 78 RatePainfulMov \
+-gltsym "SYM: +1*RateDeliciousMov" -glt_label 79 RateDeliciousMov \
+-gltsym "SYM: +1*RateSexyMovM" -glt_label 80 RateSexyMovM \
+-gltsym "SYM: +1*ForeignRead" -glt_label 81 ForeignRead \
+-gltsym "SYM: +1*ForeignReadQ" -glt_label 82 ForeignReadQ \
+-gltsym "SYM: +1*CalcHard" -glt_label 83 CalcHard \
+-gltsym "SYM: +1*CalcEasy" -glt_label 84 CalcEasy \
+-gltsym "SYM: +1*TrafficSign" -glt_label 85 TrafficSign \
+-gltsym "SYM: +1*RateTired" -glt_label 86 RateTired \
+-gltsym "SYM: +1*MemoryNameHard" -glt_label 87 MemoryNameHard \
+-gltsym "SYM: +1*MatchNameHard" -glt_label 88 MatchNameHard \
+-gltsym "SYM: +1*DomesiticName" -glt_label 89 DomesiticName \
+-gltsym "SYM: +1*MemoryNameEasy" -glt_label 90 MemoryNameEasy \
+-gltsym "SYM: +1*MatchNameEasy" -glt_label 91 MatchNameEasy \
+-gltsym "SYM: +1*WorldName" -glt_label 92 WorldName \
+-gltsym "SYM: +1*DetectDifference" -glt_label 93 DetectDifference \
+-gltsym "SYM: +1*RateNoisy" -glt_label 94 RateNoisy \
+-gltsym "SYM: +1*DecideFood" -glt_label 95 DecideFood \
+-gltsym "SYM: +1*RecallTaskEasy" -glt_label 96 RecallTaskEasy \
+-gltsym "SYM: +1*MemoryDigit" -glt_label 97 MemoryDigit \
+-gltsym "SYM: +1*RecallPast" -glt_label 98 RecallPast \
+-gltsym "SYM: +1*MatchDigit" -glt_label 99 MatchDigit \
+-gltsym "SYM: +1*TimeValue" -glt_label 100 TimeValue \
+-gltsym "SYM: +1*RateHappyMov" -glt_label 101 RateHappyMov \
+-gltsym "SYM: +1*Harmony" -glt_label 102 Harmony \
+-rout \
+-tout \
+-bucket FIRmodel_MNI_stats \
+-errts FIRmodel_errts.nii.gz \
+-noFDR \
+-nocout \
+-jobs 16 \
+-ok_1D_text

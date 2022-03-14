@@ -1,8 +1,6 @@
 from thalpy import base
-from thalpy.constants import wildcards
+from thalpy.constants import wildcards, paths
 import pandas as pd
-import settings as s
-import sys
 import math
 
 
@@ -17,7 +15,8 @@ def print_FD_stats(dir_tree, subjects, threshold=0.2):
     print(subjects)
     for subject_index, subject in enumerate(subjects):
         sub_files = base.get_ses_files(
-            subject, subject.fmriprep_dir + bs.FUNC_DIR, f"*{wildcards.REGRESSOR_WC}"
+            subject, subject.fmriprep_dir +
+            paths.FUNC_DIR, f"*{wildcards.REGRESSOR_WC}"
         )
         sub_points_over = 0
         total_points = 0
@@ -67,7 +66,10 @@ def print_FD_stats(dir_tree, subjects, threshold=0.2):
         print(FD_mean)
         print(pct_points_over)
         # add row onto output dataframe
-        sub_output_df.loc[subject_index] = [subject.name, FD_mean, pct_points_over]
+        sub_output_df.loc[subject_index] = [
+            subject.name, FD_mean, pct_points_over]
 
-    run_output_df.to_csv(dir_tree.analysis_dir + "FD_stats_runs.csv", index=False)
-    sub_output_df.to_csv(dir_tree.analysis_dir + "FD_stats_subject.csv", index=False)
+    run_output_df.to_csv(dir_tree.analysis_dir +
+                         "FD_stats_runs.csv", index=False)
+    sub_output_df.to_csv(dir_tree.analysis_dir +
+                         "FD_stats_subject.csv", index=False)

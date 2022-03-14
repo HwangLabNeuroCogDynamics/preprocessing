@@ -1,14 +1,21 @@
 #!/bin/bash
 
 # BASE SCRIPT
-BASE_SCRIPT
+/bin/echo Running on compute node: `hostname`.
+/bin/echo Job: $JOB_ID
+/bin/echo In directory: `pwd`
+/bin/echo Starting on: `date`
 
-dataset_dir=DATASET_DIR
-slots=SLOTS
-bids_dir=BIDS_DIR
-singularity_path=SING_PATH
-working_dir=WORK_DIR
-freesurfer_lic=LIC_PATH
+
+subjects=(10042)
+echo subjects: ${subjects[@]}
+
+dataset_dir=/data/backed_up/shared/ThalHi_MRI_2020/
+slots=16
+bids_dir=/data/backed_up/shared/ThalHi_MRI_2020/BIDS/
+singularity_path=/opt/fmriprep/fmriprep.simg
+working_dir=/data/backed_up/shared/ThalHi_MRI_2020/work/
+freesurfer_lic=/opt/freesurfer/license.txt
 logs_dir=${dataset_dir}fmriprep/logs/
 is_failed=false
 
@@ -19,8 +26,9 @@ echo singularity_path: $singularity_path
 echo working_directory: $working_dir
 echo freesurfer_license: $freesurfer_lic
 
-for subject in $subjects
-do
+for subject in "${subjects[@]}"
+do  {
+  echo Starting fmriprep on $subject
   ( echo Starting fmriprep on $subject
 
   if [ -f ${dataset_dir}freesurfer/sub-${subject}/scripts/IsRunning.lh+rh ]; then
@@ -37,22 +45,25 @@ do
   -w $working_dir \
   --fs-license-file $freesurfer_lic \
   --skip-bids-validation \
-  OPTIONS
-
+  
   } ||
   {
-    # when erorr is thrown
+    # when error is thrown
     is_failed=true
-    if [ grep -Fxq "A process in the process pool was terminated abruptly while the future was running or pending."  ]; then
-      echo $subject >> ${logs_dir}mem_failed_subjects.txt
-    else
-      echo $subject >> ${logs_dir}failed_subjects.txt
-    fi
+    echo "$subject failed. Check logs for more information."
+    
+    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+    echo $subject >> ${logs_dir}failed_subjects.txt
   }
+  ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e"
 
   if [ "$is_failed" = false ]; then
+    echo "$subject successfully completed."
+    sed -i "/${subject}/d" ${logs_dir}failed_subjects.txt
+    sed -i "/${subject}/d" ${logs_dir}completed_subjects.txt
     echo $subject >> ${logs_dir}completed_subjects.txt
-  fi ) 1> "${logs_dir}${subject}.o" 2> "${logs_dir}${subject}.e" &
+  fi
+  } &
 done
 wait
 

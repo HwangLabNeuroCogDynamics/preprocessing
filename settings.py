@@ -29,7 +29,9 @@ FMRIPREP = "fmriprep"
 DECONVOLVE = "3dDeconvolve"
 MEMA = "3dmema"
 FD_STATS = "FD_stats"
-DEFAULT_WORKFLOW = [HEUDICONV, MRIQC, FMRIPREP, DECONVOLVE, MEMA, FD_STATS]
+REGRESSORS = "regressors"
+DEFAULT_WORKFLOW = [HEUDICONV, MRIQC, FMRIPREP,
+                    DECONVOLVE, MEMA, FD_STATS, REGRESSORS]
 JOB_SCRIPTS_DIR = "/Shared/lss_kahwang_hpc/scripts/jobs/"
 
 # HPC settings
@@ -69,8 +71,6 @@ DEFAULT_COLUMNS = [
     "rot_y",
     "rot_z",
 ]
-REGRESSOR_FILE = "nuisance.1D"
-CENSOR_FILE = "censor.1D"
 EVENTS_WC = "*events.tsv"
 STIM_CONFIG = "stim_config.csv"
 BUCKET_FILE = "FIRmodel_MNI_stats"
